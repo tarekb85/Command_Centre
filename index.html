@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Tarek · Command Center v5</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2309090b'/%3E%3C!-- candle 1 (green, tall) --%3E%3Crect x='5' y='10' width='4' height='14' rx='1' fill='%2310b981'/%3E%3Cline x1='7' y1='7' x2='7' y2='10' stroke='%2310b981' stroke-width='1.5'/%3E%3Cline x1='7' y1='24' x2='7' y2='27' stroke='%2310b981' stroke-width='1.5'/%3E%3C!-- candle 2 (indigo, medium) --%3E%3Crect x='14' y='8' width='4' height='10' rx='1' fill='%236366f1'/%3E%3Cline x1='16' y1='5' x2='16' y2='8' stroke='%236366f1' stroke-width='1.5'/%3E%3Cline x1='16' y1='18' x2='16' y2='22' stroke='%236366f1' stroke-width='1.5'/%3E%3C!-- candle 3 (amber, short) --%3E%3Crect x='23' y='13' width='4' height='8' rx='1' fill='%23f59e0b'/%3E%3Cline x1='25' y1='10' x2='25' y2='13' stroke='%23f59e0b' stroke-width='1.5'/%3E%3Cline x1='25' y1='21' x2='25' y2='24' stroke='%23f59e0b' stroke-width='1.5'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#09090b; --panel:#111113; --line:#27272a; --line2:#18181b;
+    --txt:#e4e4e7; --mut:#71717a; --dim:#52525b;
+    --green:#10b981; --indigo:#6366f1; --amber:#f59e0b; --red:#ef4444; --violet:#8b5cf6; --blue:#627eea;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'DM Sans',-apple-system,system-ui,sans-serif;padding:18px 12px 90px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto}
+  .eyebrow{font-size:11px;color:var(--indigo);font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+  h1{font-size:23px;font-weight:800;letter-spacing:-.02em;color:#fafafa;margin:4px 0 2px}
+  .sub{font-size:12px;color:var(--dim);line-height:1.5}
+  .source{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-left:8px;letter-spacing:.05em;font-weight:700;vertical-align:middle}
+  .source.inline{background:#27272a;color:#a1a1aa}
+  .source.gist{background:#052e16;color:#4ade80;border:1px solid #166534}
+  .source.dirty{background:#1c1400;color:#fcd34d;border:1px solid #713f12}
+  .source.err{background:#1f0a0a;color:#fca5a5;border:1px solid #991b1b}
+  .tabs{display:flex;gap:3px;background:#161618;border-radius:11px;padding:4px;margin:18px 0 14px;flex-wrap:wrap}
+  .tab{padding:8px 13px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:var(--dim);font-weight:600;font-size:12.5px;font-family:inherit;display:flex;align-items:center;gap:5px}
+  .tab.on{background:#27272a;color:#fafafa;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+  .tab .ct{font-size:10px;color:var(--dim);background:#0a0a0b;border-radius:4px;padding:1px 5px}
+  .tab.on .ct{color:#a1a1aa}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 14px;overflow-x:auto}
+  .note{font-size:12.5px;border-radius:9px;padding:10px 14px;margin-bottom:14px;line-height:1.55}
+  .note.indigo{background:#1e1b4b;border:1px solid #3730a3;color:#a5b4fc}
+  .note.green{background:#052e16;border:1px solid #166534;color:#6ee7b7}
+  .note.amber{background:#1c1400;border:1px solid #713f12;color:#fcd34d}
+  .note.red{background:#1f0a0a;border:1px solid #991b1b;color:#fca5a5}
+  .btn{background:#27272a;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn:hover{background:#3f3f46}
+  .btn-primary{background:#10b98122;border:1px solid #166534;color:#4ade80}
+  .btn-primary:hover{background:#10b98144}
+  .btn-amber{background:#f59e0b22;border:1px solid #713f12;color:#fcd34d}
+  .btn-red{background:#ef444422;border:1px solid #991b1b;color:#fca5a5}
+  .stamp{font-size:11px;color:var(--dim)}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .card{flex:1;min-width:140px;background:#161618;border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+  .card .lbl{font-size:11px;color:var(--dim);margin-bottom:4px}
+  .card .val{font-size:20px;font-weight:800;letter-spacing:-.02em}
+  .card .vs{font-size:11px;margin-top:3px}
+  /* Token card (list rows) */
+  .tcard{background:#0f0f11;border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:7px;transition:border-color .15s}
+  .tcard:hover{border-color:#3f3f46}
+  .tcard.dragging{opacity:.4}
+  .tcard-row{display:flex;align-items:center;gap:9px}
+  .rank{color:var(--indigo);font-weight:800;font-size:14px;min-width:24px;text-align:center}
+  .chip{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;flex-shrink:0;letter-spacing:-.03em}
+  .tinfo{flex:1;min-width:0}
+  .tname{font-weight:700;color:#f4f4f5;font-size:13.5px}
+  .tsub{color:var(--mut);font-size:11px}
+  .tprice{font-family:monospace;font-weight:700;font-size:13px;color:#f4f4f5;text-align:right}
+  .t24h{font-family:monospace;font-size:11px;text-align:right}
+  .narr{background:#18181b;color:#a1a1aa;border:1px solid var(--line);border-radius:5px;padding:2px 8px;font-size:11px;white-space:nowrap}
+  .badge{border-radius:5px;padding:2px 9px;font-size:10.5px;font-weight:800;letter-spacing:.04em;white-space:nowrap;cursor:pointer}
+  .b-acc{background:#052e16;color:#4ade80;border:1px solid #166534}
+  .b-build{background:#1e1b4b;color:#a5b4fc;border:1px solid #3730a3}
+  .b-hold{background:#1c1917;color:#a8a29e;border:1px solid #44403c}
+  .b-watch{background:#1c1400;color:#fcd34d;border:1px solid #713f12}
+  .b-exit{background:#1f0a0a;color:#f87171;border:1px solid #991b1b}
+  .tnote{color:#94a3b8;font-size:11.5px;line-height:1.45;margin-top:6px;padding-left:46px}
+  .tactions{display:flex;gap:4px;justify-content:flex-end;margin-top:7px;padding-left:46px;flex-wrap:wrap}
+  .iconbtn{background:#161618;border:1px solid var(--line);color:#a1a1aa;border-radius:6px;padding:5px 7px;cursor:pointer;font-size:12px;font-family:inherit}
+  .iconbtn:hover{background:#27272a;color:#e4e4e7}
+  .iconbtn:disabled{opacity:.3;cursor:not-allowed}
+  .iconbtn.danger{color:#fca5a5}
+  .iconbtn.danger:hover{background:#1f0a0a;border-color:#991b1b}
+  /* Edit form */
+  .editrow{background:#0a0a0b;border:1px solid #3730a3;border-radius:10px;padding:12px;margin-bottom:7px}
+  .editrow input,.editrow textarea,.editrow select{width:100%;background:#161618;border:1px solid #27272a;border-radius:6px;padding:7px 9px;color:#e4e4e7;font-size:13px;font-family:inherit;outline:none}
+  .editrow textarea{resize:vertical;min-height:55px}
+  .editrow label{font-size:10.5px;color:var(--dim);font-weight:700;letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:3px}
+  .editgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  /* Floating save bar */
+  .savebar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#161618;border:1px solid #fcd34d;border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 12px 36px rgba(0,0,0,.6);z-index:50;flex-wrap:wrap;max-width:calc(100% - 28px)}
+  .savebar .count{background:#fcd34d;color:#0a0a0a;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:800}
+  .savebar .msg{font-size:12.5px;color:#fcd34d;font-weight:600}
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:14px}
+  .modal{background:#0f0f11;border:1px solid var(--line);border-radius:14px;padding:18px;max-width:680px;width:100%;max-height:88vh;overflow-y:auto}
+  .modal h3{font-size:15px;color:#fafafa;font-weight:800;margin-bottom:8px}
+  .modal pre{background:#0a0a0b;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:11px;color:#a1a1aa;max-height:300px;font-family:'SF Mono',monospace}
+  .move-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .move-list button{text-align:left;padding:10px 12px;background:#161618;border:1px solid var(--line);border-radius:8px;color:#e4e4e7;cursor:pointer;font-family:inherit;font-size:13px}
+  .move-list button:hover{background:#27272a;border-color:#3f3f46}
+  /* Calendar */
+  .cal-row{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--line2)}
+  .cal-row:last-child{border:none}
+  .cal-date{flex-shrink:0;min-width:80px;font-size:11px;color:#a1a1aa;font-weight:700}
+  .cal-event{font-size:13px;color:#fafafa;font-weight:600}
+  .cal-action{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.4}
+  .sev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .sev-high{background:var(--red)} .sev-med{background:var(--amber)} .sev-low{background:var(--green)}
+  /* Rotations */
+  .roty-section{background:#0f1419;border:1px solid #1e293b;border-radius:14px;padding:16px;margin-bottom:16px}
+  .roty-title{font-size:14px;font-weight:800;color:#fafafa;margin-bottom:4px}
+  .roty-sub{font-size:11px;color:var(--dim);margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{padding:8px;text-align:left;color:var(--dim);font-weight:600;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+  th.r,td.r{text-align:right}
+  td{padding:10px 8px;border-bottom:1px solid var(--line2);vertical-align:middle}
+  .open-item{padding:10px 12px;background:#161618;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;font-size:12.5px;color:#d4d4d8;display:flex;gap:10px;align-items:flex-start}
+  .open-item .n{color:var(--indigo);font-weight:800}
+  .foot{margin-top:18px;padding:14px;background:#0f1419;border:1px solid #1e293b;border-radius:10px;font-size:11.5px;color:#64748b;line-height:1.6}
+  /* Toast */
+  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#065f46;color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:120}
+  /* Login screen */
+  #login-screen{display:flex;min-height:80vh;align-items:center;justify-content:center;padding:20px}
+  .login-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px 24px;max-width:360px;width:100%}
+  .login-card h2{font-size:18px;font-weight:800;color:#fafafa;margin-bottom:4px}
+  .login-field{margin-bottom:12px}
+  .login-field label{font-size:10.5px;color:var(--dim);font-weight:700;letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:4px}
+  .login-field input{width:100%;background:#161618;border:1px solid #27272a;border-radius:8px;padding:10px 12px;color:#e4e4e7;font-size:14px;font-family:inherit;outline:none}
+  .login-field input:focus{border-color:#6366f1}
+  .login-error{color:#fca5a5;font-size:12px;min-height:16px;margin-bottom:8px}
+  .login-btn{width:100%;background:#10b98122;border:1px solid #166534;color:#4ade80;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+  .login-btn:hover{background:#10b98144}
+  .login-btn:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div id="login-screen">
+  <form class="login-card" id="login-form">
+    <h2>Tarek · Command Center</h2>
+    <div class="sub" style="margin-bottom:18px">Sign in to Business &amp; Investment</div>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="login-email" autocomplete="username" required />
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="login-password" autocomplete="current-password" required />
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button type="submit" class="login-btn" id="login-submit">Sign in</button>
+  </form>
+</div>
+<div id="app-shell" style="display:none">
+<div class="wrap">
+  <!-- HEADER -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+    <div>
+      <div class="eyebrow">Tarek · Command Center · v5 (Supabase)</div>
+      <h1>Conviction · Portfolio · Rotations <span class="source" id="src">loading…</span></h1>
+      <div class="sub" id="stamp">connecting…</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" id="refresh">↻ Prices</button>
+      <button class="btn" id="reload">⟳ Reload</button>
+      <button class="btn" id="signout">⎋ Sign out</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-t="generalist">🎯 Generalist <span class="ct" id="ct-generalist"></span></button>
+    <button class="tab" data-t="tradfi">🏛️ TradFi <span class="ct" id="ct-tradfi"></span></button>
+    <button class="tab" data-t="watchlist">👁 Watchlist <span class="ct" id="ct-watchlist"></span></button>
+    <button class="tab" data-t="portfolio">💼 Portfolio</button>
+    <button class="tab" data-t="rotations">🔄 Rotations</button>
+    <button class="tab" data-t="calendar">📅 Calendar</button>
+    <button class="tab" data-t="open">📋 Open Items</button>
+  </div>
+
+  <!-- LIST PANELS (generalist, tradfi, watchlist) -->
+  <div class="panel" data-panel="generalist">
+    <div class="note indigo"><b>Claude's A+++ Generalist Stack</b> — ranked on value capture. <em>Click any token to edit, reorder, or move between lists.</em></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-primary" onclick="openAdd('generalist')">+ Add token</button>
+    </div>
+    <div id="list-generalist"></div>
+  </div>
+
+  <div class="panel" data-panel="tradfi" style="display:none">
+    <div class="note green"><b>Claude's A+++ TradFi Stack</b> — pure TradFi/real-revenue lens.</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-primary" onclick="openAdd('tradfi')">+ Add token</button>
+    </div>
+    <div id="list-tradfi"></div>
+  </div>
+
+  <div class="panel" data-panel="watchlist" style="display:none">
+    <div class="note amber"><b>Watchlist</b> — candidates being monitored.</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-primary" onclick="openAdd('watchlist')">+ Add token</button>
+    </div>
+    <div id="list-watchlist"></div>
+  </div>
+
+  <!-- PORTFOLIO -->
+  <div class="panel" data-panel="portfolio" style="display:none">
+    <div class="cards" id="pf-cards"></div>
+    <table><thead><tr><th>Token</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th><th>Note</th></tr></thead><tbody id="t-portfolio"></tbody></table>
+  </div>
+
+  <!-- ROTATIONS -->
+  <div class="panel" data-panel="rotations" style="display:none" id="rotations-panel"></div>
+
+  <!-- CALENDAR -->
+  <div class="panel" data-panel="calendar" style="display:none">
+    <div class="note amber"><b>Upcoming catalysts &amp; decisions</b> · 🔴 high · 🟡 medium · 🟢 monitor</div>
+    <div id="t-calendar"></div>
+  </div>
+
+  <!-- OPEN ITEMS -->
+  <div class="panel" data-panel="open" style="display:none">
+    <div class="note red"><b>Open items / pending decisions</b></div>
+    <div id="t-open"></div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<!-- FLOATING SAVE BAR -->
+<div class="savebar" id="savebar" style="display:none">
+  <span class="count" id="dirty-count">0</span>
+  <span class="msg">unsaved change(s)</span>
+  <button class="btn btn-primary" onclick="saveToSupabase()">💾 Save changes</button>
+  <button class="btn" onclick="discardChanges()">↶ Discard</button>
+</div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — Supabase project (Business & Investment).
+   Reads/writes go straight to Postgres via PostgREST.
+   Falls back to inline SEED data if the connection fails.
+   ============================================================ */
+const SUPABASE_URL = "https://gdrhkvrjarnhrhhoxxum.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkcmhrdnJqYXJuaHJoaG94eHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NDAyNTEsImV4cCI6MjEwMjIxNjI1MX0.plmA6dTFQNJpI3x2fcOcZucQzNUnvb3NWDpZtpNLtqM";
+const REST = SUPABASE_URL + "/rest/v1/";
+
+/* ============================================================
+   AUTH — Supabase email/password session, kept in localStorage
+   so you're not asked to log in every time this file is opened.
+   Sign-ups are disabled project-side; this is the one account
+   created via Authentication > Users > Add user in the dashboard.
+   ============================================================ */
+const AUTH_KEY = "tci_auth_session";
+let session = null;
+
+function loadStoredSession() {
+  try { const raw = localStorage.getItem(AUTH_KEY); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function storeSession(s) {
+  session = s;
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(s)); } catch (e) {}
+}
+function clearSession() {
+  session = null;
+  try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
+}
+function sbHeaders(extra) {
+  const h = { apikey: SUPABASE_KEY, "Content-Type": "application/json", Authorization: "Bearer " + (session ? session.access_token : SUPABASE_KEY) };
+  return extra ? Object.assign(h, extra) : h;
+}
+async function signIn(email, password) {
+  const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=password", {
+    method: "POST", headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error_description || body.msg || ("HTTP " + res.status));
+  storeSession({ access_token: body.access_token, refresh_token: body.refresh_token, expires_at: Date.now() + (body.expires_in || 3600) * 1000 });
+}
+async function refreshSessionToken() {
+  if (!session || !session.refresh_token) return false;
+  try {
+    const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: session.refresh_token })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return false;
+    storeSession({ access_token: body.access_token, refresh_token: body.refresh_token || session.refresh_token, expires_at: Date.now() + (body.expires_in || 3600) * 1000 });
+    return true;
+  } catch (e) { return false; }
+}
+async function ensureSession() {
+  session = loadStoredSession();
+  if (!session) return false;
+  if (Date.now() > session.expires_at - 60000) {
+    const ok = await refreshSessionToken();
+    if (!ok) { clearSession(); return false; }
+  }
+  return true;
+}
+function showLogin(message) {
+  document.getElementById("app-shell").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("login-error").textContent = message || "";
+}
+function showApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-shell").style.display = "block";
+}
+
+const C = { green:'#10b981', indigo:'#6366f1', amber:'#f59e0b', red:'#ef4444', violet:'#8b5cf6', blue:'#627eea', link:'#375bd2', mkr:'#1aab9b' };
+const tokenColor = { TAO:C.indigo, HYPE:C.amber, PENDLE:C.green, ETH:C.blue, AR:C.green, NEAR:C.indigo, ONDO:C.green, SYRUP:C.amber, STX:C.green, AKT:C.green, CFG:C.amber, ATH:C.amber, BABY:C.amber, ENA:C.amber, LINK:C.link, AAVE:C.violet, SKY:C.mkr, CPOOL:C.indigo, ZRO:C.indigo, ROSE:'#fbbf24', FLR:'#71717a', HEMI:C.amber, ZEC:C.amber, GEN:C.amber, SOL:C.amber, INJ:C.green, BTC:C.amber, KTA:'#a1a1aa', XPL:C.violet, ADA:'#3468d1', NIGHT:C.violet };
+
+const SEED = {
+  version: "v1.0",
+  lastUpdated: "2026-06-14T22:00:00Z",
+  generalist: [
+    { token:"TAO",    name:"Bittensor",     narrative:"AI Compute",        status:"ACCUMULATE", cgid:"bittensor",      note:"Hard 21M cap, real subnet economy. $1.4B subnet ecosystem." },
+    { token:"HYPE",   name:"Hyperliquid",   narrative:"Derivatives",       status:"HOLD",       cgid:"hyperliquid",    note:"~97% fees → buybacks. Cleanest revenue-to-token loop. At ATH — entry risk." },
+    { token:"PENDLE", name:"Pendle",        narrative:"Fixed Income",      status:"BUILDING",   cgid:"pendle",         note:"On-chain rate swap market. vePENDLE locks supply. $40M annualized rev. 80% → buybacks." },
+    { token:"ETH",    name:"Ethereum",      narrative:"Settlement",        status:"WATCH",      cgid:"ethereum",       note:"The anchor. Half the list runs on it. No position — gap." },
+    { token:"AR",     name:"Arweave",       narrative:"Storage / AI Data", status:"ACCUMULATE", cgid:"arweave",        note:"Cleanest tokenomics in dataset. Endowment model. AO live. No position yet — gap." },
+    { token:"NEAR",   name:"NEAR Protocol", narrative:"AI Agents",         status:"BUILDING",   cgid:"near",           note:"Agent pivot working. $10B Intents, 100% fees → buybacks. Now a real position." },
+    { token:"ONDO",   name:"Ondo Finance",  narrative:"RWA",               status:"BUILDING",   cgid:"ondo-finance",   note:"JPM/Mastercard/Chainlink. Ondo Perps live Jun 9. Quadruple AI convergence." },
+    { token:"SYRUP",  name:"Maple Finance", narrative:"RWA Credit",        status:"HOLD",       cgid:"syrup",          note:"Real lending revenue + 25% buybacks + Revolut. Thin liquidity is the risk." },
+    { token:"STX",    name:"Stacks",        narrative:"BTCFi",             status:"ACCUMULATE", cgid:"blockstack",     note:"PoX earns native BTC yield. Best BTCFi loop. Triple convergence. No position — gap." },
+    { token:"AKT",    name:"Akash",         narrative:"DePIN / Cloud",     status:"WATCH",      cgid:"akash-network",  note:"Usage requires staking. Uncensored compute moat. No position." },
+    { token:"CFG",    name:"Centrifuge",    narrative:"RWA Infra",         status:"HOLD",       cgid:"centrifuge",     note:"Coinbase strategic investment. 125M user gateway. $1B+ TVL. Token capture weak link." },
+    { token:"ATH",    name:"Aethir",        narrative:"DePIN / GPU",       status:"HOLD",       cgid:"aethir",         note:"$127.8M revenue but 42B max supply = unlock wall." },
+    { token:"BABY",   name:"Babylon",       narrative:"BTCFi",             status:"WATCH",      cgid:"babylon",        note:"57k+ BTC locked, a16z." },
+    { token:"ENA",    name:"Ethena",        narrative:"Stablecoins",       status:"WATCH",      cgid:"ethena",         note:"Real revenue but VC unlock overhang + rate-dependent. Fee switch = catalyst." },
+    { token:"LINK",   name:"Chainlink",     narrative:"Infrastructure",    status:"WATCH",      cgid:"chainlink",      note:"Won $1B from ZRO security stumble. No position." },
+  ],
+  tradfi: [
+    { token:"ONDO",   name:"Ondo Finance",  narrative:"Tokenized Treasuries",   status:"BUILDING", cgid:"ondo-finance",      note:"Management fees on TVL. JPM/Mastercard/Chainlink." },
+    { token:"LINK",   name:"Chainlink",     narrative:"Data + CCIP",            status:"WATCH",    cgid:"chainlink",         note:"SWIFT/DTCC/Euroclear pilots. Won $1B from ZRO incident." },
+    { token:"AAVE",   name:"Aave",          narrative:"Institutional Lending",  status:"HOLD",     cgid:"aave",              note:"All-weather. Makes money in bull AND bear. Reserve-factor revenue." },
+    { token:"SKY",    name:"Sky / Maker",   narrative:"RWA Central Bank",       status:"WATCH",    cgid:"sky",               note:"Smart Burn Engine: T-bill yield → buyback & burn." },
+    { token:"PENDLE", name:"Pendle",        narrative:"Fixed Income",           status:"BUILDING", cgid:"pendle",            note:"3% fee on all yield → vePENDLE holders." },
+    { token:"ETH",    name:"Ethereum",      narrative:"Settlement Rail",        status:"WATCH",    cgid:"ethereum",          note:"The rail most of this list runs on." },
+    { token:"SYRUP",  name:"Maple Finance", narrative:"Institutional Credit",   status:"HOLD",     cgid:"syrup",             note:"Real loan revenue + 25% buybacks." },
+    { token:"CFG",    name:"Centrifuge",    narrative:"Tokenized Credit",       status:"HOLD",     cgid:"centrifuge",        note:"Real off-chain origination via SPVs. Token capture is weak link." },
+    { token:"CPOOL",  name:"Clearpool",     narrative:"Uncollateralized Credit",status:"WATCH",    cgid:"clearpool",         note:"Wintermute/Amber borrowers. Interest → CPOOL buybacks. Credit: Gemini." },
+    { token:"ZRO",    name:"LayerZero",     narrative:"Crosschain Rails",       status:"HOLD",     cgid:"layerzero",         note:"Fee switch live, 70% stablecoin flow, DTCC/ICE/Citadel. ⚠ Oct unlock." },
+  ],
+  watchlist: [
+    { token:"AR",   name:"Arweave",   narrative:"Storage / AI Data",     status:"ACCUMULATE", cgid:"arweave",            note:"On A+++ at #5 but no position yet. Trigger: any conditions allowing entry." },
+    { token:"STX",  name:"Stacks",    narrative:"BTCFi",                 status:"ACCUMULATE", cgid:"blockstack",         note:"Triple convergence. Trigger: BTCFi entry decision STX vs HEMI vs BABY." },
+    { token:"SOL",  name:"Solana",    narrative:"L1 / DeFi",             status:"WATCH",      cgid:"solana",             note:"Gemini's #1. Open disagreement — never properly resolved." },
+    { token:"ROSE", name:"Oasis",     narrative:"Confidential Compute",  status:"WATCH",      cgid:"oasis-network",      note:"TEE-based private AI. Real wedge but hardware dependency = structural risk." },
+    { token:"HEMI", name:"Hemi",      narrative:"Bitcoin L2",            status:"WATCH",      cgid:"hemi",               note:"Jeff Garzik. Founder cliff ends Sept 2026. STX now beats it on convergence." },
+    { token:"GEN",  name:"Gensyn",    narrative:"AI Training",           status:"WATCH",      cgid:"gensyn",             note:"a16z-backed. 87% supply unlocked = risk. Monitor adoption 6-12mo." },
+    { token:"ZEC",  name:"Zcash",     narrative:"Privacy",               status:"WATCH",      cgid:"zcash",              note:"Battle-tested. 800%+ in 2025. Proven vs Midnight." },
+    { token:"INJ",  name:"Injective", narrative:"Derivatives",           status:"WATCH",      cgid:"injective-protocol", note:"4/5 tokenomics, 60% fee burn. Real value-capture mechanic." },
+    { token:"FLR",  name:"Flare",     narrative:"Programmable XRP",      status:"EXIT",       cgid:"flare-networks",     note:"Dropped from A+++. Out-paced niche. Hold what you have — not an add." },
+  ],
+  portfolio: [
+    { token:"TAO",    name:"Bittensor",     qty:31.162126,  costEur:6726.56, cgid:"bittensor",    note:"A+++ #1" },
+    { token:"BTC",    name:"Bitcoin",       qty:0.11032,    costEur:7120.42, cgid:"bitcoin",      note:"Core hold" },
+    { token:"CFG",    name:"Centrifuge",    qty:27102.057,  costEur:4753.30, cgid:"centrifuge",   note:"A+++ #11" },
+    { token:"XPL",    name:"Plasma",        qty:54897.111,  costEur:4947.75, cgid:"plasma",       note:"Watch July 28 unlock" },
+    { token:"KTA",    name:"Keeta",         qty:25426.91,   costEur:4763.68, cgid:"keeta",        note:"⚠ UNRESOLVED — needs decision, not deferral" },
+    { token:"ZRO",    name:"LayerZero",     qty:4046.6104,  costEur:4497.79, cgid:"layerzero",    note:"Mid-conviction post-blog. Don't add before Oct unlock" },
+    { token:"SYRUP",  name:"Maple Finance", qty:21403.584,  costEur:3929.37, cgid:"syrup",        note:"A+++ #8. Thesis intact despite drawdown" },
+    { token:"ONDO",   name:"Ondo Finance",  qty:7370.881,   costEur:2056.05, cgid:"ondo-finance", note:"A+++ #7, building" },
+    { token:"PENDLE", name:"Pendle",        qty:1943.1814,  costEur:1991.22, cgid:"pendle",       note:"A+++ #3, building" },
+    { token:"NEAR",   name:"NEAR Protocol", qty:492.66799,  costEur:852.57,  cgid:"near",         note:"A+++ #6, now a real position" },
+    { token:"ATH",    name:"Aethir",        qty:87913.85,   costEur:440.81,  cgid:"aethir",       note:"A+++ #12" },
+    { token:"AAVE",   name:"Aave",          qty:1.4285,     costEur:77.83,   cgid:"aave",         note:"New — from ADA exit proceeds" },
+  ],
+  rotations: [
+    { id:"flr", name:"FLR → CFG + PENDLE + ZRO", executedOn:"2026-06-05", soldToken:"FLR", soldQty:386870.67, soldPriceEur:0.00582, soldCgid:"flare-networks",
+      basket: [
+        { token:"CFG",    qty:4745.76, costEur:844.27, cgid:"centrifuge" },
+        { token:"PENDLE", qty:737.36,  costEur:772.75, cgid:"pendle" },
+        { token:"ZRO",    qty:722.22,  costEur:631.22, cgid:"layerzero" },
+      ],
+      note: "FLR fully exited at -54.55% realized. Proceeds redeployed across CFG, PENDLE, ZRO." },
+    { id:"cfg", name:"CFG → Multi-asset (incl. KTA buyback)", executedOn:"2026-06-09 → 06-12", soldToken:"CFG", soldQty:44000, soldPriceEur:0.228, soldCgid:"centrifuge",
+      basket: [
+        { token:"ZRO",   qty:2760,  costEur:2430, cgid:"layerzero" },
+        { token:"TAO",   qty:2.54,  costEur:638,  cgid:"bittensor" },
+        { token:"KTA",   qty:15550, costEur:2021, cgid:"keeta",       note:"buyback after Jun 9 reduction" },
+        { token:"XPL",   qty:31000, costEur:2604, cgid:"plasma" },
+        { token:"SYRUP", qty:18435, costEur:2397, cgid:"syrup" },
+      ],
+      note: "CFG partial rotation. Includes KTA buyback (15,550 tokens) using CFG proceeds." }
+  ],
+  calendar: [
+    { date:"2026-07-28", token:"XPL",  event:"XPL 1B token unlock (~50% supply increase)",             action:"Don't add before. Monitor closely. Reassess in August.",  severity:"high" },
+    { date:"2026-08-09", token:"ADA",  event:"ADA CME 6-month maturation — SEC ETF approval window", action:"Exit liquidity for brother/friend advisory rotation. Sell into any pump.", severity:"high" },
+    { date:"2026-09-01", token:"HEMI", event:"Hemi founder cliff ends",                                action:"Potential re-rating catalyst. Watch for follow-through volume.", severity:"med" },
+    { date:"2026-10-02", token:"ZRO",  event:"ZRO strategic-partner unlock (32.2% allocation)",        action:"Don't add aggressively before. If holds support post-print → buy signal.", severity:"high" },
+    { date:"2026-Q4",    token:"ZRO",  event:"Zero L1 launch (fall 2026)",                             action:"Day-zero partners: DTCC, ICE, Citadel, Tether, Google Cloud.", severity:"med" },
+    { date:"TBD",        token:"ENA",  event:"Ethena fee switch activation (binary catalyst)",          action:"On activation → promote ENA to A+++.", severity:"med" },
+    { date:"2027-01-01", token:"BOX3", event:"Dutch Box 3 snapshot date",                               action:"Year-end sizing matters for tax exposure (DAC8 enforcement).", severity:"med" }
+  ],
+  openItems: [
+    "KTA remaining position (~25,426 tokens, ~€3,684) — no conviction framework justification. Needs a decision, not another deferral.",
+    "BTCFi entry point: STX vs HEMI vs BABY — STX has emerged as convergence + mechanics winner.",
+    "ETH gap — Zero exposure. Half the conviction stack runs on it.",
+    "HYPE gap — #2 on A+++. Zero exposure. At ATH — wait for pullback.",
+    "AR gap — #5 on A+++. Zero position despite conviction. Needs sizing decision.",
+    "STX gap — Triple convergence. No position. BTCFi thesis getting stronger.",
+    "Next multi-AI convergence round — when? Gemini's solo picks get extra weight (track record: AR, CPOOL).",
+    "SOL — Gemini's #1. Neither Tarek nor Claude holds. Open disagreement never resolved.",
+    "Advisory positions (brother/friend ADA) — August 2026 ETF = exit liquidity."
+  ]
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let savedData = null;     // last known synced state (from gist or seed)
+let data = null;          // current working state (may have unsaved edits)
+let prices = {};
+let activeTab = "generalist";
+let editingKey = null;    // "listName-index" when editing
+let movingKey = null;     // "listName-index" when picking target list
+
+const eur = (n) => n==null ? "—" : "€" + n.toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const px = (n) => n==null ? "—" : n >= 1000 ? "€"+n.toLocaleString("en-US",{maximumFractionDigits:0}) : n>=1 ? "€"+n.toFixed(2) : "€"+n.toFixed(4);
+const pct = (n) => n==null ? "—" : (n>=0?"+":"") + n.toFixed(1) + "%";
+const statusClass = (s) => ({ACCUMULATE:"b-acc",BUILDING:"b-build",HOLD:"b-hold",WATCH:"b-watch",EXIT:"b-exit"}[s] || "b-hold");
+const chip = (token) => {
+  const c = tokenColor[token] || "#71717a";
+  return `<div class="chip" style="background:${c}22;border:1px solid ${c}55;color:${c}">${(token||"?").slice(0,4)}</div>`;
+};
+const isDirty = () => JSON.stringify(data) !== JSON.stringify(savedData);
+
+/* ============================================================
+   LOAD / SAVE
+   ============================================================ */
+const loadErrorDetails = {};
+
+async function fetchTable(url, label) {
+  let lastDetail = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers: sbHeaders() });
+      if (res.ok) { delete loadErrorDetails[label]; return await res.json(); }
+      if (res.status === 401 || res.status === 403) { clearSession(); location.reload(); return null; }
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch (e2) {}
+      lastDetail = `HTTP ${res.status} ${res.statusText || ""} — ${bodyText.slice(0, 200)}`;
+      console.warn(`[supabase:${label}] ${lastDetail} (attempt ${attempt + 1})`);
+    } catch (e) {
+      lastDetail = `${e.name || "Error"}: ${e.message || e}`;
+      console.warn(`[supabase:${label}] fetch error (attempt ${attempt + 1}):`, e);
+    }
+    if (attempt < 2) await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+  }
+  loadErrorDetails[label] = lastDetail;
+  return null;
+}
+
+async function loadData() {
+  const srcEl = document.getElementById("src");
+  srcEl.className = "source gist";
+  srcEl.textContent = "loading · supabase…";
+
+  const [ci, ph, rot, rbi, ce, oi, mar, mrk] = await Promise.all([
+    fetchTable(REST + "conviction_items?select=*&order=list_name.asc,rank.asc", "conviction_items"),
+    fetchTable(REST + "portfolio_holdings?select=*", "portfolio_holdings"),
+    fetchTable(REST + "rotations?select=*&order=position.asc", "rotations"),
+    fetchTable(REST + "rotation_basket_items?select=*&order=rotation_id.asc,position.asc", "rotation_basket_items"),
+    fetchTable(REST + "calendar_events?select=*&order=event_date.asc", "calendar_events"),
+    fetchTable(REST + "open_items?select=*&order=created_at.asc", "open_items"),
+    fetchTable(REST + "multi_ai_rounds?select=*", "multi_ai_rounds"),
+    fetchTable(REST + "multi_ai_rankings?select=*&order=ai_name.asc,rank.asc", "multi_ai_rankings"),
+  ]);
+
+  let anyFailed = false, anySucceeded = false;
+  const loadErrors = { generalist: false, tradfi: false, watchlist: false, portfolio: false, rotations: false, calendar: false, openItems: false, multiAI: false };
+
+  let generalist, tradfi, watchlist;
+  if (ci) {
+    anySucceeded = true;
+    const byList = { generalist: [], tradfi: [], watchlist: [] };
+    ci.forEach(r => { if (byList[r.list_name]) byList[r.list_name].push({ id: r.id, token: r.token, name: r.name, narrative: r.narrative, status: r.status, cgid: r.cgid, note: r.note }); });
+    generalist = byList.generalist; tradfi = byList.tradfi; watchlist = byList.watchlist;
+  } else { anyFailed = true; generalist = []; tradfi = []; watchlist = []; loadErrors.generalist = loadErrors.tradfi = loadErrors.watchlist = true; }
+
+  let portfolio;
+  if (ph) { anySucceeded = true; portfolio = ph.map(r => ({ id: r.id, token: r.token, name: r.name, qty: Number(r.qty), costEur: r.cost_eur == null ? null : Number(r.cost_eur), cgid: r.cgid, note: r.note })); }
+  else { anyFailed = true; portfolio = []; loadErrors.portfolio = true; }
+
+  let rotations;
+  if (rot && rbi) {
+    anySucceeded = true;
+    const basketByRotation = {};
+    rbi.forEach(r => { (basketByRotation[r.rotation_id] = basketByRotation[r.rotation_id] || []).push({ token: r.token, qty: Number(r.qty), costEur: r.cost_eur == null ? null : Number(r.cost_eur), cgid: r.cgid, note: r.note }); });
+    rotations = rot.map(r => ({ id: r.id, name: r.name, executedOn: r.executed_on, soldToken: r.sold_token, soldQty: Number(r.sold_qty), soldPriceEur: r.sold_price_eur == null ? null : Number(r.sold_price_eur), soldCgid: r.sold_cgid, status: r.status, note: r.note, basket: basketByRotation[r.id] || [] }));
+  } else { anyFailed = true; rotations = []; loadErrors.rotations = true; }
+
+  let calendar;
+  if (ce) { anySucceeded = true; calendar = ce.map(r => ({ date: r.event_date, token: r.token, event: r.event, action: r.action, severity: r.severity })); }
+  else { anyFailed = true; calendar = []; loadErrors.calendar = true; }
+
+  let openItems;
+  if (oi) { anySucceeded = true; openItems = oi.map(r => r.item); }
+  else { anyFailed = true; openItems = []; loadErrors.openItems = true; }
+
+  let multiAI = null;
+  if (mar && mrk) {
+    anySucceeded = true;
+    const rankingsByAi = {};
+    mrk.forEach(r => { (rankingsByAi[r.ai_name] = rankingsByAi[r.ai_name] || []).push({ rank: r.rank, token: r.token, mechCapture: r.mech_capture, note: r.note }); });
+    multiAI = mar[0] ? { round: mar[0].round_label, date: mar[0].round_date, prompt: mar[0].prompt, methodology_note: mar[0].methodology_note, lists: rankingsByAi } : null;
+  } else { anyFailed = true; loadErrors.multiAI = true; }
+
+  const loaded = {
+    version: anyFailed ? (anySucceeded ? "v5-partial" : "v5-failed") : "v5-supabase",
+    lastUpdated: new Date().toISOString(),
+    generalist, tradfi, watchlist, portfolio, rotations, calendar, openItems, multiAI, loadErrors,
+    loadErrorDetails: Object.assign({}, loadErrorDetails)
+  };
+
+  if (!anyFailed) { srcEl.className = "source gist"; srcEl.textContent = "live · supabase"; }
+  else if (anySucceeded) { srcEl.className = "source dirty"; srcEl.textContent = "partial — see below"; }
+  else { srcEl.className = "source err"; srcEl.textContent = "supabase failed — see below"; }
+
+  savedData = loaded;
+  data = JSON.parse(JSON.stringify(loaded));
+  const errSummary = Object.keys(loadErrorDetails).length
+    ? `<div style="margin-top:6px;padding:8px 10px;background:#1f0a0a;border:1px solid #991b1b;border-radius:8px;color:#fca5a5;font-family:monospace;font-size:11px;line-height:1.6;word-break:break-word">` +
+      Object.entries(loadErrorDetails).map(([k,v]) => `<b>${k}:</b> ${v.replace(/</g,'&lt;')}`).join('<br>') +
+      `</div>`
+    : "";
+  document.getElementById("stamp").innerHTML = `loaded ${new Date().toLocaleString()} · Business &amp; Investment (Supabase)${errSummary}`;
+  renderCounts();
+  renderActive();
+  refreshSaveBar();
+  fetchPrices();
+}
+
+function markDirty() {
+  data.lastUpdated = new Date().toISOString();
+  refreshSaveBar();
+}
+
+function refreshSaveBar() {
+  const sb = document.getElementById("savebar");
+  if (!isDirty()) { sb.style.display = "none"; return; }
+  const a = JSON.stringify(savedData), b = JSON.stringify(data);
+  // simple "count" estimate: number of differing top-level sections
+  let count = 0;
+  ["generalist","tradfi","watchlist","portfolio","calendar","openItems","rotations"].forEach(k => {
+    if (JSON.stringify(savedData[k]||{}) !== JSON.stringify(data[k]||{})) count++;
+  });
+  document.getElementById("dirty-count").textContent = count || 1;
+  sb.style.display = "flex";
+  document.getElementById("src").className = "source dirty";
+  document.getElementById("src").textContent = "unsaved changes";
+}
+
+function discardChanges() {
+  if (!confirm("Discard all unsaved changes?")) return;
+  data = JSON.parse(JSON.stringify(savedData));
+  editingKey = null; movingKey = null;
+  renderActive();
+  refreshSaveBar();
+  document.getElementById("src").className = "source gist";
+  document.getElementById("src").textContent = "live · supabase";
+  toast("Discarded");
+}
+
+async function saveToSupabase() {
+  const sb = document.getElementById("savebar");
+  const btns = sb.querySelectorAll("button");
+  btns.forEach(b => b.disabled = true);
+  toast("Saving to Supabase…");
+  try {
+    // Only the three conviction lists are editable in this UI. Save = replace
+    // those rows wholesale (delete + reinsert current order), same semantics
+    // as the old "rewrite the whole gist file" model, just scoped to one table.
+    const delRes = await fetch(REST + "conviction_items?list_name=in.(generalist,tradfi,watchlist)", {
+      method: "DELETE", headers: sbHeaders()
+    });
+    if (!delRes.ok) throw new Error("delete failed: HTTP " + delRes.status);
+
+    const rows = [];
+    ["generalist", "tradfi", "watchlist"].forEach(listName => {
+      (data[listName] || []).forEach((x, i) => {
+        rows.push({ list_name: listName, rank: i + 1, token: x.token, name: x.name, narrative: x.narrative, status: x.status, cgid: x.cgid, note: x.note });
+      });
+    });
+    const insRes = await fetch(REST + "conviction_items", {
+      method: "POST",
+      headers: sbHeaders({ Prefer: "return=minimal" }),
+      body: JSON.stringify(rows)
+    });
+    if (!insRes.ok) throw new Error("insert failed: HTTP " + insRes.status);
+
+    savedData = JSON.parse(JSON.stringify(data));
+    refreshSaveBar();
+    document.getElementById("src").className = "source gist";
+    document.getElementById("src").textContent = "live · supabase";
+    toast("✓ Saved to Supabase");
+  } catch (e) {
+    console.error("Save failed:", e);
+    toast("✗ Save failed — check console");
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+/* ============================================================
+   PRICES
+   ============================================================ */
+async function fetchPrices() {
+  try {
+    const ids = new Set();
+    ["generalist","tradfi","watchlist","portfolio"].forEach(k => (data[k]||[]).forEach(x => x.cgid && ids.add(x.cgid)));
+    (data.rotations||[]).forEach(r => { if(r.soldCgid) ids.add(r.soldCgid); (r.basket||[]).forEach(b => b.cgid && ids.add(b.cgid)); });
+    if (ids.size === 0) return;
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${[...ids].join(",")}&vs_currencies=eur&include_24hr_change=true`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP "+res.status);
+    prices = await res.json();
+    renderActive();
+  } catch (e) { console.warn("Price fetch failed:", e); }
+}
+
+/* ============================================================
+   EDIT / REORDER / MOVE / ADD / DELETE
+   ============================================================ */
+function startEdit(listName, idx) { editingKey = listName + "-" + idx; movingKey = null; renderActive(); }
+function cancelEdit() { editingKey = null; renderActive(); }
+function saveEdit(listName, idx) {
+  const f = document.getElementById("editform");
+  const fields = ["token","name","narrative","status","cgid","note"];
+  fields.forEach(k => { const el = f.querySelector(`[name=${k}]`); if (el) data[listName][idx][k] = el.value; });
+  if (data[listName][idx].token) data[listName][idx].token = data[listName][idx].token.toUpperCase();
+  editingKey = null;
+  markDirty(); renderActive(); toast("Edited");
+}
+function moveUp(listName, idx) {
+  if (idx === 0) return;
+  [data[listName][idx-1], data[listName][idx]] = [data[listName][idx], data[listName][idx-1]];
+  markDirty(); renderActive();
+}
+function moveDown(listName, idx) {
+  if (idx === data[listName].length-1) return;
+  [data[listName][idx+1], data[listName][idx]] = [data[listName][idx], data[listName][idx+1]];
+  markDirty(); renderActive();
+}
+function startMove(listName, idx) { movingKey = listName + "-" + idx; editingKey = null; renderActive(); }
+function cancelMove() { movingKey = null; renderActive(); }
+function moveToList(fromList, idx, toList) {
+  if (fromList === toList) { movingKey = null; renderActive(); return; }
+  const item = data[fromList][idx];
+  data[fromList].splice(idx, 1);
+  data[toList].push(item);
+  movingKey = null; markDirty(); renderActive();
+  toast(`${item.token} → ${toList}`);
+}
+function deleteItem(listName, idx) {
+  const item = data[listName][idx];
+  if (!confirm(`Delete ${item.token} from ${listName}?`)) return;
+  data[listName].splice(idx, 1);
+  markDirty(); renderActive(); toast(`Deleted ${item.token}`);
+}
+function openAdd(listName) {
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-bg" id="addmodal" onclick="if(event.target===this)closeAdd()">
+      <div class="modal">
+        <h3>+ Add token to ${listName}</h3>
+        <div class="editgrid">
+          <div><label>Token *</label><input id="ad-token" placeholder="e.g. TAO" /></div>
+          <div><label>Project name *</label><input id="ad-name" placeholder="e.g. Bittensor" /></div>
+          <div><label>Narrative</label><input id="ad-narrative" placeholder="e.g. AI Compute" /></div>
+          <div><label>Status</label>
+            <select id="ad-status"><option>ACCUMULATE</option><option>BUILDING</option><option selected>HOLD</option><option>WATCH</option><option>EXIT</option></select>
+          </div>
+          <div style="grid-column:span 2"><label>CoinGecko ID (for live prices)</label><input id="ad-cgid" placeholder="e.g. bittensor (lowercase, from coingecko URL)" /></div>
+        </div>
+        <div><label>Notes</label><textarea id="ad-note" placeholder="One-line thesis"></textarea></div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px">
+          <button class="btn" onclick="closeAdd()">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmAdd('${listName}')">Add</button>
+        </div>
+      </div>
+    </div>`);
+}
+function closeAdd() { document.getElementById("addmodal")?.remove(); }
+function confirmAdd(listName) {
+  const item = {
+    token: document.getElementById("ad-token").value.toUpperCase(),
+    name: document.getElementById("ad-name").value,
+    narrative: document.getElementById("ad-narrative").value,
+    status: document.getElementById("ad-status").value,
+    cgid: document.getElementById("ad-cgid").value,
+    note: document.getElementById("ad-note").value,
+  };
+  if (!item.token || !item.name) { alert("Token and name are required"); return; }
+  data[listName].push(item);
+  markDirty(); renderActive(); closeAdd(); toast(`Added ${item.token}`); fetchPrices();
+}
+
+/* ============================================================
+   CYCLE STATUS (click badge)
+   ============================================================ */
+function cycleStatus(listName, idx) {
+  const order = ["ACCUMULATE","BUILDING","HOLD","WATCH","EXIT"];
+  const cur = data[listName][idx].status;
+  const next = order[(order.indexOf(cur)+1) % order.length];
+  data[listName][idx].status = next;
+  markDirty(); renderActive();
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderCounts() {
+  document.getElementById("ct-generalist").textContent = data.generalist?.length || 0;
+  document.getElementById("ct-tradfi").textContent = data.tradfi?.length || 0;
+  document.getElementById("ct-watchlist").textContent = data.watchlist?.length || 0;
+}
+
+function renderList(listName) {
+  const items = data[listName] || [];
+  const container = document.getElementById("list-" + listName);
+  if (!container) return;
+  if (items.length === 0) {
+    container.innerHTML = (data.loadErrors && data.loadErrors[listName])
+      ? `<div style="padding:20px;text-align:center;"><span class="note red">Couldn't load this list from Supabase. Click ⟳ Reload above.</span></div>`
+      : `<div style="padding:30px;text-align:center;color:#52525b;font-size:13px">Empty list. Click "+ Add" to start.</div>`;
+    return;
+  }
+  container.innerHTML = items.map((x, i) => renderTokenCard(listName, x, i, items.length)).join("");
+}
+
+function renderTokenCard(listName, x, i, total) {
+  const key = listName + "-" + i;
+  const p = prices[x.cgid];
+  const price = p?.eur;
+  const ch = p?.eur_24h_change;
+  const chCls = ch == null ? "" : ch >= 0 ? "pos" : "neg";
+
+  if (editingKey === key) {
+    return `<div class="editrow" id="editform">
+      <div class="editgrid">
+        <div><label>Token</label><input name="token" value="${x.token||""}" /></div>
+        <div><label>Name</label><input name="name" value="${x.name||""}" /></div>
+        <div><label>Narrative</label><input name="narrative" value="${x.narrative||""}" /></div>
+        <div><label>Status</label>
+          <select name="status">
+            <option ${x.status==="ACCUMULATE"?"selected":""}>ACCUMULATE</option>
+            <option ${x.status==="BUILDING"?"selected":""}>BUILDING</option>
+            <option ${x.status==="HOLD"?"selected":""}>HOLD</option>
+            <option ${x.status==="WATCH"?"selected":""}>WATCH</option>
+            <option ${x.status==="EXIT"?"selected":""}>EXIT</option>
+          </select>
+        </div>
+        <div style="grid-column:span 2"><label>CoinGecko ID</label><input name="cgid" value="${x.cgid||""}" /></div>
+      </div>
+      <label>Notes</label><textarea name="note">${x.note||""}</textarea>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn btn-primary" onclick="saveEdit('${listName}',${i})">✓ Save</button>
+        <button class="btn" onclick="cancelEdit()">Cancel</button>
+      </div>
+    </div>`;
+  }
+
+  if (movingKey === key) {
+    const others = ["generalist","tradfi","watchlist"].filter(l => l !== listName);
+    return `<div class="editrow">
+      <div style="font-size:12px;color:#a1a1aa;margin-bottom:8px">Move <b style="color:#fafafa">${x.token}</b> to:</div>
+      <div class="move-list">
+        ${others.map(l => `<button onclick="moveToList('${listName}',${i},'${l}')">${l === "generalist" ? "🎯 Generalist" : l === "tradfi" ? "🏛️ TradFi" : "👁 Watchlist"}</button>`).join("")}
+        <button onclick="cancelMove()" style="color:#a1a1aa">Cancel</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="tcard">
+    <div class="tcard-row">
+      <span class="rank">#${i+1}</span>
+      ${chip(x.token)}
+      <div class="tinfo">
+        <div class="tname">${x.token||"?"}</div>
+        <div class="tsub">${x.name||""} · <span class="narr" style="margin-left:2px">${x.narrative||""}</span></div>
+      </div>
+      <div>
+        <div class="tprice">${px(price)}</div>
+        <div class="t24h ${chCls}">${ch==null?"—":pct(ch)}</div>
+      </div>
+      <span class="badge ${statusClass(x.status)}" onclick="cycleStatus('${listName}',${i})" title="Click to cycle">${x.status}</span>
+    </div>
+    ${x.note ? `<div class="tnote">${x.note}</div>` : ""}
+    <div class="tactions">
+      <button class="iconbtn" onclick="moveUp('${listName}',${i})" ${i===0?"disabled":""} title="Move up">↑</button>
+      <button class="iconbtn" onclick="moveDown('${listName}',${i})" ${i===total-1?"disabled":""} title="Move down">↓</button>
+      <button class="iconbtn" onclick="startMove('${listName}',${i})" title="Move to another list">⇄</button>
+      <button class="iconbtn" onclick="startEdit('${listName}',${i})" title="Edit">✎</button>
+      <button class="iconbtn danger" onclick="deleteItem('${listName}',${i})" title="Delete">×</button>
+    </div>
+  </div>`;
+}
+
+function renderPortfolio() {
+  if (data.loadErrors && data.loadErrors.portfolio) {
+    document.getElementById("pf-cards").innerHTML = `<div class="note red" style="flex:1"><b>Couldn't load portfolio from Supabase.</b> Not showing €0 totals as if they were real — click ⟳ Reload above.</div>`;
+    document.getElementById("t-portfolio").innerHTML = "";
+    return;
+  }
+  const items = data.portfolio || [];
+  let totalValue = 0, totalCost = 0;
+  const rows = items.map(x => {
+    const p = prices[x.cgid];
+    const price = p?.eur;
+    const value = price ? x.qty * price : null;
+    const pl = (value != null && x.costEur != null) ? value - x.costEur : null;
+    const plPct = (pl != null && x.costEur > 0) ? (pl / x.costEur * 100) : null;
+    if (value) totalValue += value;
+    if (x.costEur) totalCost += x.costEur;
+    const plClass = pl == null ? "" : pl >= 0 ? "pos" : "neg";
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px">${chip(x.token)}<div><div class="tname">${x.token}</div><div class="tsub">${x.name||""}</div></div></div></td>
+      <td class="r" style="font-family:monospace">${x.qty.toLocaleString("en-US",{maximumFractionDigits:4})}</td>
+      <td class="r" style="font-family:monospace;color:#a1a1aa">${eur(x.costEur)}</td>
+      <td class="r" style="font-family:monospace">${px(price)}</td>
+      <td class="r" style="font-family:monospace;font-weight:700">${eur(value)}</td>
+      <td class="r ${plClass}" style="font-family:monospace">${pl==null?"—":(pl>=0?"+":"")+eur(pl)}<br><span style="font-size:10.5px">${plPct==null?"":pct(plPct)}</span></td>
+      <td style="font-size:11.5px;color:#94a3b8">${x.note||""}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("t-portfolio").innerHTML = rows;
+  const totalPL = totalValue - totalCost;
+  const totalPLPct = totalCost > 0 ? totalPL/totalCost*100 : 0;
+  const plClass = totalPL >= 0 ? "pos" : "neg";
+  document.getElementById("pf-cards").innerHTML = `
+    <div class="card"><div class="lbl">Total value</div><div class="val">${eur(totalValue)}</div></div>
+    <div class="card"><div class="lbl">Total cost basis</div><div class="val" style="color:#a1a1aa">${eur(totalCost)}</div></div>
+    <div class="card" style="border-color:${totalPL>=0?'#166534':'#991b1b'}"><div class="lbl">Total P&amp;L</div><div class="val ${plClass}">${totalPL>=0?"+":""}${eur(totalPL)}</div><div class="vs ${plClass}">${totalPL>=0?"+":""}${totalPLPct.toFixed(1)}%</div></div>
+    <div class="card"><div class="lbl">Positions</div><div class="val">${items.length}</div></div>`;
+}
+
+function renderRotations() {
+  const sections = (data.rotations||[]).map(r => {
+    const counterPrice = prices[r.soldCgid]?.eur;
+    const counterValue = counterPrice ? r.soldQty * counterPrice : null;
+    let basketValue = 0, basketCost = 0;
+    const basketRows = r.basket.map(b => {
+      const bp = prices[b.cgid]?.eur;
+      const v = bp ? b.qty * bp : null;
+      if (v != null) basketValue += v;
+      if (b.costEur) basketCost += b.costEur;
+      const pl = (v != null && b.costEur != null) ? v - b.costEur : null;
+      const plPct = (pl != null && b.costEur > 0) ? pl / b.costEur * 100 : null;
+      const cls = pl == null ? "" : pl >= 0 ? "pos" : "neg";
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:8px">${chip(b.token)}<div><div class="tname">${b.token}</div><div class="tsub">${b.note||""}</div></div></div></td>
+        <td class="r" style="font-family:monospace">${b.qty.toLocaleString("en-US",{maximumFractionDigits:3})}</td>
+        <td class="r" style="font-family:monospace;color:#a1a1aa">${eur(b.costEur)}</td>
+        <td class="r" style="font-family:monospace">${px(bp)}</td>
+        <td class="r" style="font-family:monospace;font-weight:700">${eur(v)}</td>
+        <td class="r ${cls}" style="font-family:monospace">${pl==null?"—":(pl>=0?"+":"")+eur(pl)}<br><span style="font-size:10.5px">${plPct==null?"":pct(plPct)}</span></td>
+      </tr>`;
+    }).join("");
+    const alpha = (basketValue && counterValue) ? basketValue - counterValue : null;
+    const alphaPct = alpha != null && counterValue > 0 ? alpha/counterValue*100 : null;
+    const ac = alpha == null ? "" : alpha >= 0 ? "pos" : "neg";
+    const basketPL = basketValue - basketCost;
+    const basketPLPct = basketCost > 0 ? basketPL/basketCost*100 : 0;
+    const bc = basketPL >= 0 ? "pos" : "neg";
+    return `<div class="roty-section">
+      <div class="roty-title">${r.name}</div>
+      <div class="roty-sub">Executed ${r.executedOn} · ${r.note||""}</div>
+      <div class="cards">
+        <div class="card"><div class="lbl">Basket value now</div><div class="val">${eur(basketValue)}</div><div class="vs ${bc}">${basketPL>=0?"+":""}${eur(basketPL)} (${pct(basketPLPct)})</div></div>
+        <div class="card"><div class="lbl">If you'd HELD ${r.soldToken}</div><div class="val" style="color:#a1a1aa">${eur(counterValue)}</div><div class="vs">${r.soldQty.toLocaleString()} ${r.soldToken} @ ${px(counterPrice)}</div></div>
+        <div class="card" style="border-color:${alpha>=0?'#166534':'#991b1b'}"><div class="lbl">Rotation alpha</div><div class="val ${ac}">${alpha==null?"—":(alpha>=0?"+":"")+eur(alpha)}</div><div class="vs ${ac}">${alphaPct==null?"":(alpha>=0?"winning by ":"behind by ")+Math.abs(alphaPct).toFixed(1)+"%"}</div></div>
+      </div>
+      <table><thead><tr><th>Position</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th></tr></thead><tbody>${basketRows}</tbody></table>
+    </div>`;
+  }).join("");
+  document.getElementById("rotations-panel").innerHTML = sections ||
+    (data.loadErrors && data.loadErrors.rotations
+      ? `<div class="note red"><b>Couldn't load rotations from Supabase.</b> Showing nothing rather than stale or partial data.<br><span style="font-family:monospace;font-size:11px">${((data.loadErrorDetails && (data.loadErrorDetails.rotations || data.loadErrorDetails.rotation_basket_items)) || "unknown error").replace(/</g,'&lt;')}</span></div>`
+      : `<div class="note amber">No rotations recorded.</div>`);
+}
+
+function renderCalendar() {
+  if (data.loadErrors && data.loadErrors.calendar) {
+    document.getElementById("t-calendar").innerHTML = `<div class="note red">Couldn't load calendar from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const sevClass = { high:"sev-high", med:"sev-med", low:"sev-low" };
+  const rows = (data.calendar||[]).map(c => `
+    <div class="cal-row">
+      <div class="sev-dot ${sevClass[c.severity]||'sev-low'}"></div>
+      <div class="cal-date">${c.date}</div>
+      <div style="flex:1">
+        <div class="cal-event">${chip(c.token)} <span style="margin-left:6px">${c.event}</span></div>
+        <div class="cal-action">${c.action}</div>
+      </div>
+    </div>`).join("");
+  document.getElementById("t-calendar").innerHTML = rows;
+}
+
+function renderOpen() {
+  if (data.loadErrors && data.loadErrors.openItems) {
+    document.getElementById("t-open").innerHTML = `<div class="note red">Couldn't load open items from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const rows = (data.openItems||[]).map((o,i) => `<div class="open-item"><span class="n">${i+1}.</span><span>${o}</span></div>`).join("");
+  document.getElementById("t-open").innerHTML = rows;
+}
+
+function renderActive() {
+  if (["generalist","tradfi","watchlist"].includes(activeTab)) renderList(activeTab);
+  if (activeTab === "portfolio") renderPortfolio();
+  if (activeTab === "rotations") renderRotations();
+  if (activeTab === "calendar") renderCalendar();
+  if (activeTab === "open") renderOpen();
+  renderCounts();
+}
+
+/* ============================================================
+   TABS / EVENTS
+   ============================================================ */
+document.getElementById("tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("on"));
+  b.classList.add("on");
+  activeTab = b.dataset.t;
+  document.querySelectorAll("[data-panel]").forEach(p => p.style.display = p.dataset.panel === activeTab ? "" : "none");
+  editingKey = null; movingKey = null;
+  renderActive();
+});
+document.getElementById("refresh").addEventListener("click", fetchPrices);
+document.getElementById("reload").addEventListener("click", () => {
+  if (isDirty() && !confirm("You have unsaved changes. Reload will discard them. Continue?")) return;
+  loadData();
+});
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+
+document.getElementById("foot").innerHTML = `
+  <b style="color:#94a3b8">How v5 works:</b> click any token to <b>edit</b>, use ↑↓ to <b>reorder</b>, ⇄ to <b>move</b> between lists, click status badge to <b>cycle</b>. Changes are local until you hit <b>Save changes</b> — that writes straight to Supabase, no copy-paste.<br>
+  <b style="color:#94a3b8">Backend:</b> Supabase project "Business &amp; Investment". Conviction lists (Generalist/TradFi/Watchlist) are editable here. Portfolio, Rotations, Calendar, and Open Items are populated by Claude during chats and shown read-only here for now.`;
+
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const btn = document.getElementById("login-submit");
+  btn.disabled = true; btn.textContent = "Signing in…";
+  try {
+    await signIn(email, password);
+    showApp();
+    loadData();
+    setInterval(fetchPrices, 60000);
+  } catch (err) {
+    document.getElementById("login-error").textContent = err.message || "Sign-in failed";
+  } finally {
+    btn.disabled = false; btn.textContent = "Sign in";
+  }
+});
+document.getElementById("signout").addEventListener("click", () => {
+  clearSession();
+  showLogin();
+});
+
+(async function boot() {
+  const ok = await ensureSession();
+  if (ok) { showApp(); loadData(); setInterval(fetchPrices, 60000); }
+  else { showLogin(); }
+})();
+</script>
+</body>
+</html>
