@@ -870,7 +870,20 @@ function renderRotations() {
         <div class="card"><div class="lbl">If you'd HELD ${r.soldToken}</div><div class="val" style="color:#a1a1aa">${eur(counterValue)}</div><div class="vs">${r.soldQty.toLocaleString()} ${r.soldToken} @ ${px(counterPrice)}</div></div>
         <div class="card" style="border-color:${alpha>=0?'#166534':'#991b1b'}"><div class="lbl">Rotation alpha</div><div class="val ${ac}">${alpha==null?"—":(alpha>=0?"+":"")+eur(alpha)}</div><div class="vs ${ac}">${alphaPct==null?"":(alpha>=0?"winning by ":"behind by ")+Math.abs(alphaPct).toFixed(1)+"%"}</div></div>
       </div>
-      <table><thead><tr><th>Position</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th></tr></thead><tbody>${basketRows}</tbody></table>
+      <table><thead><tr><th>Position</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th></tr></thead><tbody>${basketRows}</tbody>${(() => {
+        if (!basketValue || !counterPrice) return "";
+        const buyback = basketValue / counterPrice;
+        const deltaTokens = buyback - r.soldQty;
+        const deltaPct = r.soldQty > 0 ? deltaTokens / r.soldQty * 100 : null;
+        const dcls = deltaTokens >= 0 ? "pos" : "neg";
+        const fmt = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+        return `<tfoot><tr style="border-top:2px solid #3f3f46;background:rgba(255,255,255,0.025)">
+          <td><div class="tname">Buys back in ${r.soldToken}</div><div class="tsub">basket value ÷ ${r.soldToken} @ ${px(counterPrice)}</div></td>
+          <td class="r" style="font-family:monospace;font-weight:700">${fmt(buyback)}</td>
+          <td colspan="3" class="r" style="font-family:monospace;color:#a1a1aa;font-size:11.5px">vs ${fmt(r.soldQty)} ${r.soldToken} originally sold</td>
+          <td class="r ${dcls}" style="font-family:monospace">${deltaTokens >= 0 ? "+" : ""}${fmt(deltaTokens)}<br><span style="font-size:10.5px">${deltaPct == null ? "" : pct(deltaPct)}</span></td>
+        </tr></tfoot>`;
+      })()}</table>
     </div>`;
   }).join("");
   document.getElementById("rotations-panel").innerHTML = sections ||
