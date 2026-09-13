@@ -188,15 +188,6 @@
     <button class="tab" data-t="rotations">🔄 Rotations</button>
     <button class="tab" data-t="calendar">📅 Calendar</button>
     <button class="tab" data-t="open">📋 Open Items</button>
-    <button class="tab" data-t="test" style="background:#7f1d1d;color:#fecaca">🧪 TEST</button>
-  </div>
-
-  <!-- TEST TAB — temporary, for diagnosing a caching issue. Safe to remove later. -->
-  <div class="panel" data-panel="test" style="display:none">
-    <div class="note red" style="font-size:16px;text-align:center;padding:30px">
-      <b>If you can see this tab, the latest push reached your browser.</b><br><br>
-      Build stamp: <span style="font-family:monospace;background:#000;padding:4px 10px;border-radius:6px">2026-09-13 11:28 UTC</span>
-    </div>
   </div>
 
   <!-- LIST PANELS (generalist, tradfi, watchlist) -->
@@ -969,7 +960,7 @@ function renderRotations() {
     const bc = basketPL >= 0 ? "pos" : "neg";
 
     // NEW LAYOUT — piloting on FLR first
-    if (r.name === "flr") {
+    if (r.id === "flr") {
       const buyback = (basketValue && counterPrice) ? basketValue / counterPrice : null;
       const deltaTokens = buyback != null ? buyback - r.soldQty : null;
       const deltaPct = (deltaTokens != null && r.soldQty > 0) ? deltaTokens / r.soldQty * 100 : null;
