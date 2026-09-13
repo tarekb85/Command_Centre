@@ -137,6 +137,13 @@
   th.sortable::after{content:'';margin-left:4px;opacity:.3;font-size:9px}
   th.sortable.asc::after{content:'▲';opacity:1;color:var(--indigo)}
   th.sortable.desc::after{content:'▼';opacity:1;color:var(--indigo)}
+  /* Rotations */
+  .roty-details{margin:2px 0 10px;}
+  .roty-details summary{cursor:pointer;color:var(--indigo);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;list-style:none;padding:2px 0;user-select:none}
+  .roty-details summary::-webkit-details-marker{display:none}
+  .roty-details summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+  .roty-details[open] summary::before{transform:rotate(90deg)}
+  .roty-details[open] summary{color:var(--mut);margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -951,6 +958,42 @@ function renderRotations() {
     const basketPL = basketValue - basketCost;
     const basketPLPct = basketCost > 0 ? basketPL/basketCost*100 : 0;
     const bc = basketPL >= 0 ? "pos" : "neg";
+
+    // NEW LAYOUT — piloting on FLR first
+    if (r.name === "flr") {
+      const buyback = (basketValue && counterPrice) ? basketValue / counterPrice : null;
+      const deltaTokens = buyback != null ? buyback - r.soldQty : null;
+      const deltaPct = (deltaTokens != null && r.soldQty > 0) ? deltaTokens / r.soldQty * 100 : null;
+      const dcls = deltaTokens == null ? "" : deltaTokens >= 0 ? "pos" : "neg";
+      const fmtQ = (n) => n == null ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+      return `<div class="roty-section">
+        <div class="roty-title">${r.name.toUpperCase()} → ${r.basket.map(b => b.token).join(" + ")}</div>
+        <details class="roty-details"><summary>details</summary><div class="roty-sub">Executed ${r.executedOn} · ${r.note||""}</div></details>
+        <div class="cards">
+          <div class="card">
+            <div class="lbl">Basket value now</div>
+            <div class="val">${eur(basketValue)}</div>
+            <div class="vs ${bc}" style="margin-bottom:6px">${basketPL>=0?"+":""}${eur(basketPL)} (${pct(basketPLPct)})</div>
+            <div class="lbl" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">Buys back in ${r.soldToken}</div>
+            <div class="val" style="font-size:17px">${fmtQ(buyback)}</div>
+            <div class="vs ${dcls}">${deltaTokens==null?"":(deltaTokens>=0?"+":"")+fmtQ(deltaTokens)+" "+r.soldToken+(deltaPct==null?"":" ("+pct(deltaPct)+")")}</div>
+          </div>
+          <div class="card">
+            <div class="lbl">Original ${r.soldToken} sold</div>
+            <div class="val" style="color:#a1a1aa">${fmtQ(r.soldQty)}</div>
+            <div class="vs">worth ${eur(counterValue)} today @ ${px(counterPrice)}</div>
+          </div>
+          <div class="card" style="border-color:${alpha>=0?'#166534':'#991b1b'}">
+            <div class="lbl">Rotation alpha</div>
+            <div class="val ${ac}">${alpha==null?"—":(alpha>=0?"+":"")+eur(alpha)}</div>
+            <div class="vs ${ac}">${alphaPct==null?"":(alpha>=0?"winning by ":"behind by ")+Math.abs(alphaPct).toFixed(1)+"%"}</div>
+          </div>
+        </div>
+        <table><thead><tr><th>Position</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th></tr></thead><tbody>${basketRows}</tbody></table>
+      </div>`;
+    }
+
+    // Existing layout for other rotations (unchanged until pilot approved)
     return `<div class="roty-section">
       <div class="roty-title">${r.name}</div>
       <div class="roty-sub">Executed ${r.executedOn} · ${r.note||""}</div>
