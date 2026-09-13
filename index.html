@@ -21,7 +21,7 @@
   .sub{font-size:12px;color:var(--dim);line-height:1.5}
   .source{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-left:8px;letter-spacing:.05em;font-weight:700;vertical-align:middle}
   .source.inline{background:#27272a;color:#a1a1aa}
-  .source.gist{background:#052e16;color:#4ade80;border:1px solid #166534}
+  .source.live{background:#052e16;color:#4ade80;border:1px solid #166534}
   .source.dirty{background:#1c1400;color:#fcd34d;border:1px solid #713f12}
   .source.err{background:#1f0a0a;color:#fca5a5;border:1px solid #991b1b}
   .tabs{display:flex;gap:3px;background:#161618;border-radius:11px;padding:4px;margin:18px 0 14px;flex-wrap:wrap}
@@ -125,6 +125,18 @@
   .login-btn{width:100%;background:#10b98122;border:1px solid #166534;color:#4ade80;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
   .login-btn:hover{background:#10b98144}
   .login-btn:disabled{opacity:.5;cursor:not-allowed}
+  /* Portfolio-specific */
+  .alloc-bar{height:22px;border-radius:6px;overflow:hidden;display:flex;background:#161618;border:1px solid var(--line);margin-bottom:10px}
+  .alloc-seg{height:100%;position:relative;transition:filter .15s}
+  .alloc-seg:hover{filter:brightness(1.3)}
+  .alloc-seg .alloc-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:#000;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;padding:0 4px;white-space:nowrap}
+  .concentration-flag{font-size:11px;color:#fcd34d;background:#1c1400;border:1px solid #713f12;border-radius:6px;padding:5px 10px;margin-bottom:10px;display:inline-block}
+  .stale-flag{color:#fcd34d;font-size:11px;margin-left:4px;cursor:help}
+  th.sortable{cursor:pointer;user-select:none;position:relative}
+  th.sortable:hover{color:#fafafa}
+  th.sortable::after{content:'';margin-left:4px;opacity:.3;font-size:9px}
+  th.sortable.asc::after{content:'▲';opacity:1;color:var(--indigo)}
+  th.sortable.desc::after{content:'▼';opacity:1;color:var(--indigo)}
 </style>
 </head>
 <body>
@@ -199,7 +211,16 @@
   <!-- PORTFOLIO -->
   <div class="panel" data-panel="portfolio" style="display:none">
     <div class="cards" id="pf-cards"></div>
-    <table><thead><tr><th>Token</th><th class="r">Qty</th><th class="r">Cost €</th><th class="r">Price €</th><th class="r">Value €</th><th class="r">P&amp;L</th><th>Note</th></tr></thead><tbody id="t-portfolio"></tbody></table>
+    <div id="pf-alloc-container"></div>
+    <table><thead><tr>
+      <th class="sortable" data-sort="token">Token</th>
+      <th class="r sortable" data-sort="qty">Qty</th>
+      <th class="r sortable" data-sort="cost">Cost €</th>
+      <th class="r sortable" data-sort="price">Price €</th>
+      <th class="r sortable desc" data-sort="value">Value €</th>
+      <th class="r sortable" data-sort="pl">P&amp;L</th>
+      <th>Note</th>
+    </tr></thead><tbody id="t-portfolio"></tbody></table>
   </div>
 
   <!-- ROTATIONS -->
@@ -453,7 +474,7 @@ async function fetchTable(url, label) {
 
 async function loadData() {
   const srcEl = document.getElementById("src");
-  srcEl.className = "source gist";
+  srcEl.className = "source live";
   srcEl.textContent = "loading · supabase…";
 
   const [ci, ph, rot, rbi, ce, oi, mar, mrk] = await Promise.all([
@@ -513,7 +534,7 @@ async function loadData() {
     loadErrorDetails: Object.assign({}, loadErrorDetails)
   };
 
-  if (!anyFailed) { srcEl.className = "source gist"; srcEl.textContent = "live · supabase"; }
+  if (!anyFailed) { srcEl.className = "source live"; srcEl.textContent = "live · supabase"; }
   else if (anySucceeded) { srcEl.className = "source dirty"; srcEl.textContent = "partial — see below"; }
   else { srcEl.className = "source err"; srcEl.textContent = "supabase failed — see below"; }
 
@@ -557,7 +578,7 @@ function discardChanges() {
   editingKey = null; movingKey = null;
   renderActive();
   refreshSaveBar();
-  document.getElementById("src").className = "source gist";
+  document.getElementById("src").className = "source live";
   document.getElementById("src").textContent = "live · supabase";
   toast("Discarded");
 }
@@ -591,7 +612,7 @@ async function saveToSupabase() {
 
     savedData = JSON.parse(JSON.stringify(data));
     refreshSaveBar();
-    document.getElementById("src").className = "source gist";
+    document.getElementById("src").className = "source live";
     document.getElementById("src").textContent = "live · supabase";
     toast("✓ Saved to Supabase");
   } catch (e) {
@@ -796,42 +817,110 @@ function renderTokenCard(listName, x, i, total) {
   </div>`;
 }
 
+let pfSort = { key: "value", dir: "desc" };
+
+const PF_PALETTE = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#3b82f6","#14b8a6","#a855f7"];
+
 function renderPortfolio() {
   if (data.loadErrors && data.loadErrors.portfolio) {
     document.getElementById("pf-cards").innerHTML = `<div class="note red" style="flex:1"><b>Couldn't load portfolio from Supabase.</b> Not showing €0 totals as if they were real — click ⟳ Reload above.</div>`;
     document.getElementById("t-portfolio").innerHTML = "";
+    document.getElementById("pf-alloc-container").innerHTML = "";
     return;
   }
   const items = data.portfolio || [];
-  let totalValue = 0, totalCost = 0;
-  const rows = items.map(x => {
+
+  // Enrich each item with computed fields first, so sorting is honest
+  const enriched = items.map(x => {
     const p = prices[x.cgid];
     const price = p?.eur;
     const value = price ? x.qty * price : null;
     const pl = (value != null && x.costEur != null) ? value - x.costEur : null;
     const plPct = (pl != null && x.costEur > 0) ? (pl / x.costEur * 100) : null;
-    if (value) totalValue += value;
+    const stale = !!(x.cgid && price == null);
+    return { ...x, price, value, pl, plPct, stale };
+  });
+
+  // Sort
+  const sorted = [...enriched].sort((a, b) => {
+    const dir = pfSort.dir === "asc" ? 1 : -1;
+    const nullLast = (v) => v == null ? Infinity * dir : v;
+    const key = pfSort.key;
+    if (key === "token") return (a.token||"").localeCompare(b.token||"") * dir;
+    return (nullLast(a[key === "cost" ? "costEur" : key]) - nullLast(b[key === "cost" ? "costEur" : key])) * dir;
+  });
+
+  // Totals
+  let totalValue = 0, totalCost = 0, staleCount = 0;
+  enriched.forEach(x => {
+    if (x.value) totalValue += x.value;
     if (x.costEur) totalCost += x.costEur;
-    const plClass = pl == null ? "" : pl >= 0 ? "pos" : "neg";
+    if (x.stale) staleCount++;
+  });
+
+  // Allocation bar — only include priced positions, sorted by size
+  const allocData = enriched
+    .filter(x => x.value)
+    .sort((a, b) => b.value - a.value)
+    .map((x, i) => ({ ...x, pct: totalValue > 0 ? x.value / totalValue * 100 : 0, color: PF_PALETTE[i % PF_PALETTE.length] }));
+
+  const allocSegs = allocData.map(a =>
+    `<div class="alloc-seg" style="width:${a.pct}%;background:${a.color}" title="${a.token} · ${a.pct.toFixed(1)}% · ${eur(a.value)}">
+       ${a.pct >= 6 ? `<span class="alloc-lbl">${a.token} ${a.pct.toFixed(0)}%</span>` : ""}
+     </div>`
+  ).join("");
+  const concentration = allocData.filter(a => a.pct >= 20);
+  const concFlag = concentration.length
+    ? `<div class="concentration-flag">⚠ Concentration: ${concentration.map(c => `${c.token} at ${c.pct.toFixed(1)}%`).join(", ")}</div>`
+    : "";
+  document.getElementById("pf-alloc-container").innerHTML = allocData.length
+    ? `<div class="alloc-bar">${allocSegs}</div>${concFlag}` : "";
+
+  // Table rows
+  const rows = sorted.map(x => {
+    const plClass = x.pl == null ? "" : x.pl >= 0 ? "pos" : "neg";
+    const staleIcon = x.stale ? ` <span class="stale-flag" title="Price feed unavailable — value & P&L excluded from totals">⚠</span>` : "";
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:8px">${chip(x.token)}<div><div class="tname">${x.token}</div><div class="tsub">${x.name||""}</div></div></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">${chip(x.token)}<div><div class="tname">${x.token}${staleIcon}</div><div class="tsub">${x.name||""}</div></div></div></td>
       <td class="r" style="font-family:monospace">${x.qty.toLocaleString("en-US",{maximumFractionDigits:4})}</td>
       <td class="r" style="font-family:monospace;color:#a1a1aa">${eur(x.costEur)}</td>
-      <td class="r" style="font-family:monospace">${px(price)}</td>
-      <td class="r" style="font-family:monospace;font-weight:700">${eur(value)}</td>
-      <td class="r ${plClass}" style="font-family:monospace">${pl==null?"—":(pl>=0?"+":"")+eur(pl)}<br><span style="font-size:10.5px">${plPct==null?"":pct(plPct)}</span></td>
+      <td class="r" style="font-family:monospace">${px(x.price)}</td>
+      <td class="r" style="font-family:monospace;font-weight:700">${eur(x.value)}</td>
+      <td class="r ${plClass}" style="font-family:monospace">${x.pl==null?"—":(x.pl>=0?"+":"")+eur(x.pl)}<br><span style="font-size:10.5px">${x.plPct==null?"":pct(x.plPct)}</span></td>
       <td style="font-size:11.5px;color:#94a3b8">${x.note||""}</td>
     </tr>`;
   }).join("");
   document.getElementById("t-portfolio").innerHTML = rows;
+
+  // Sync sortable header indicators
+  document.querySelectorAll('[data-panel="portfolio"] th.sortable').forEach(th => {
+    th.classList.remove("asc","desc");
+    if (th.dataset.sort === pfSort.key) th.classList.add(pfSort.dir);
+  });
+
+  // Cards
   const totalPL = totalValue - totalCost;
   const totalPLPct = totalCost > 0 ? totalPL/totalCost*100 : 0;
   const plClass = totalPL >= 0 ? "pos" : "neg";
+  const staleNote = staleCount ? `<div class="vs" style="color:#fcd34d">${staleCount} stale price${staleCount>1?"s":""} · totals may understate</div>` : "";
   document.getElementById("pf-cards").innerHTML = `
-    <div class="card"><div class="lbl">Total value</div><div class="val">${eur(totalValue)}</div></div>
+    <div class="card"><div class="lbl">Total value</div><div class="val">${eur(totalValue)}</div>${staleNote}</div>
     <div class="card"><div class="lbl">Total cost basis</div><div class="val" style="color:#a1a1aa">${eur(totalCost)}</div></div>
     <div class="card" style="border-color:${totalPL>=0?'#166534':'#991b1b'}"><div class="lbl">Total P&amp;L</div><div class="val ${plClass}">${totalPL>=0?"+":""}${eur(totalPL)}</div><div class="vs ${plClass}">${totalPL>=0?"+":""}${totalPLPct.toFixed(1)}%</div></div>
     <div class="card"><div class="lbl">Positions</div><div class="val">${items.length}</div></div>`;
+}
+
+// Header click handler — set once, guarded so re-renders don't stack listeners
+if (!window.__pfSortWired) {
+  document.addEventListener("click", (e) => {
+    const th = e.target.closest('[data-panel="portfolio"] th.sortable');
+    if (!th) return;
+    const k = th.dataset.sort;
+    if (pfSort.key === k) pfSort.dir = pfSort.dir === "asc" ? "desc" : "asc";
+    else { pfSort.key = k; pfSort.dir = (k === "token") ? "asc" : "desc"; }
+    renderPortfolio();
+  });
+  window.__pfSortWired = true;
 }
 
 function renderRotations() {
