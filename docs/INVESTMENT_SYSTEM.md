@@ -130,6 +130,15 @@ Fields confirmed live:
 - `source_urls` (text array), `tags` (text array)
 - `next_review_date`
 - `supersedes_analysis_id` — see Versioning below
+- `debate_id` (uuid, nullable) — added 2026-09-18. Groups multiple
+  `project_analysis` rows that belong to the same opt-in formal debate
+  (e.g. a ChatGPT row and a Claude row on the same token, plus a
+  synthesis row). NULL for the overwhelming majority of rows — debates
+  are deliberately rare, not the default path for recording analysis.
+  No index yet; not justified at current volume (see migration note
+  below). Not a foreign key to anything — it's a bare grouping value,
+  not a reference to a debate-sessions table, since none exists or is
+  currently planned.
 
 **INTENDED, not yet enforced by any constraint or code:** analyses should
 never be overwritten to reflect a re-evaluation. A new re-evaluation is a
@@ -141,6 +150,40 @@ been superseded yet, so this chain is untested in practice, not just
 unenforced. If this matters enough to enforce mechanically, that would
 need a trigger or an application-level convention; neither exists yet
 (UNVERIFIED whether this has been discussed elsewhere).
+
+**Debate / multi-AI disagreement convention (INTENDED — a usage
+convention, not a schema constraint):** Formal debates are opt-in, not
+the default way analysis gets recorded. When Tarek explicitly requests
+one (e.g. "ChatGPT and Claude, debate MON"), each AI's independent take
+is its own `project_analysis` row, same `debate_id`, `analysis_by`
+identifying that AI. A third row — the synthesis — carries the resolved
+view and should be written with an `analysis_by` value that says what it
+is, e.g. `"Synthesis — ChatGPT + Claude debate, resolved by Tarek"`, not
+left ambiguous with a single AI's name. The synthesis row reuses existing
+narrative fields rather than needing new ones: `thesis` holds the
+resolved view, `key_risks`/`bear_case` hold the actual points of
+divergence between the two AIs (not a generic risk list), and
+`snapshot_notes` holds any open/unresolved question. Genuine disagreement
+between AIs is preserved as-is in their separate rows — it is never
+averaged into a blended score, and consensus is never forced. Tarek's own
+decision lives in `conviction_items`, linked via `latest_analysis_id` to
+the synthesis row, not directly to either AI's individual row — that's
+what keeps the chain traceable: conviction → synthesis → both original
+independent analyses.
+
+**`multi_ai_rounds` and `multi_ai_rankings` are not used for debates, and
+this is deliberate, not an oversight.** Those two tables represent a
+different, pre-existing concept — a portfolio-wide convergence exercise
+where a fixed set of AIs (`multi_ai_rankings.ai_name` is CHECK-constrained
+to `claude`/`grok`/`chatgpt`/`gemini`, confirmed live) rank the same list
+of tokens in one shared exercise. A debate about one project is a
+different shape of question — asynchronous, not necessarily the same
+prompt to each side, and including a synthesis step those tables were
+never built to hold. Repurposing them for debates would make one table
+responsible for two different concepts, which this system has otherwise
+deliberately avoided. Do not extend `multi_ai_rankings`' `ai_name` CHECK
+constraint to accommodate a "Tarek" or "synthesis" row for this purpose —
+that content belongs in `project_analysis` instead.
 
 ### `conviction_items` (CONFIRMED, 36 rows, live in dashboard)
 
