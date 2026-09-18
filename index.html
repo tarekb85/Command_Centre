@@ -70,6 +70,9 @@
   .b-watch{background:#1c1400;color:#fcd34d;border:1px solid #713f12}
   .b-exit{background:#1f0a0a;color:#f87171;border:1px solid #991b1b}
   .tnote{color:#94a3b8;font-size:11.5px;line-height:1.45;margin-top:6px;padding-left:46px}
+  .tnote-collapsed{color:var(--dim);font-size:11px;margin-top:6px;padding-left:46px;cursor:pointer;user-select:none}
+  .tnote-collapsed:hover{color:#a1a1aa}
+  .tnote{cursor:pointer}
   .tactions{display:flex;gap:4px;justify-content:flex-end;margin-top:7px;padding-left:46px;flex-wrap:wrap}
   .iconbtn{background:#161618;border:1px solid var(--line);color:#a1a1aa;border-radius:6px;padding:5px 7px;cursor:pointer;font-size:12px;font-family:inherit}
   .iconbtn:hover{background:#27272a;color:#e4e4e7}
@@ -185,6 +188,7 @@
   .cat-card.sev-low{border-left-color:var(--mut)}
   .cat-days{font-family:monospace;font-size:11px;color:var(--dim);white-space:nowrap;text-align:right;flex-shrink:0}
   .analysis-link{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;color:var(--indigo);cursor:pointer;margin-left:6px;text-decoration:none;border-bottom:1px dotted var(--indigo)}
+  .tname .analysis-link{background:#6366f11a;border:1px solid #6366f150;border-bottom:1px solid #6366f150;border-radius:5px;padding:1px 6px;font-size:9px;vertical-align:middle}
   .analysis-link:hover{color:#fafafa}
   .ov-highlight{background:#161618;border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:10px}
   .ov-highlight .lbl{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px}
@@ -550,6 +554,11 @@ let activeSubFor = { conviction: "generalist", holdings: "portfolio", research: 
 const SUBBED_PRIMARIES = new Set(["conviction", "holdings", "research", "schedule"]);
 let editingKey = null;    // "listName-index" when editing
 let movingKey = null;     // "listName-index" when picking target list
+let expandedNotes = new Set(); // "listName-index" keys whose long-form note is expanded
+function toggleNote(key) {
+  if (expandedNotes.has(key)) expandedNotes.delete(key); else expandedNotes.add(key);
+  renderList(activeTab);
+}
 
 const eur = (n) => n==null ? "—" : "€" + n.toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
 const px = (n) => n==null ? "—" : n >= 1000 ? "€"+n.toLocaleString("en-US",{maximumFractionDigits:0}) : n>=1 ? "€"+n.toFixed(2) : "€"+n.toFixed(4);
@@ -974,7 +983,10 @@ function renderTokenCard(listName, x, i, total) {
       </div>
       <span class="badge ${statusClass(x.status)}" onclick="cycleStatus('${listName}',${i})" title="Click to cycle">${x.status}</span>
     </div>
-    ${x.note ? `<div class="tnote">${x.note}</div>` : ""}
+    ${x.note ? (expandedNotes.has(key)
+        ? `<div class="tnote" onclick="toggleNote('${key}')" title="Tap to collapse">${x.note}</div>`
+        : `<div class="tnote-collapsed" onclick="toggleNote('${key}')" title="Tap to expand">📝 notes ▸</div>`
+      ) : ""}
     <div class="tactions">
       <button class="iconbtn" onclick="moveUp('${listName}',${i})" ${i===0?"disabled":""} title="Move up">↑</button>
       <button class="iconbtn" onclick="moveDown('${listName}',${i})" ${i===total-1?"disabled":""} title="Move down">↓</button>
