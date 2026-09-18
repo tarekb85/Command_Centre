@@ -29,6 +29,7 @@
   .tab.on{background:#27272a;color:#fafafa;box-shadow:0 1px 3px rgba(0,0,0,.5)}
   .sub-tabs{margin-top:-8px}
   .tab.sub{font-size:11.5px;padding:6px 11px}
+  .inv-card.synthesis{border-left:3px solid var(--indigo)}
   .tab .ct{font-size:10px;color:var(--dim);background:#0a0a0b;border-radius:4px;padding:1px 5px}
   .tab.on .ct{color:#a1a1aa}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 14px;overflow-x:auto}
@@ -644,7 +645,8 @@ async function loadData() {
       status: r.status, conclusion: r.conclusion, priceUsd: r.price_usd, marketCapUsd: r.market_cap_usd,
       fdvUsd: r.fdv_usd, tvlUsd: r.tvl_usd, circulatingSupply: r.circulating_supply, maxSupply: r.max_supply,
       sourceUrls: r.source_urls || [], tags: r.tags || [], snapshotNotes: r.snapshot_notes,
-      nextReviewDate: r.next_review_date, supersedesAnalysisId: r.supersedes_analysis_id, cgid: r.cgid
+      nextReviewDate: r.next_review_date, supersedesAnalysisId: r.supersedes_analysis_id, cgid: r.cgid,
+      debateId: r.debate_id
     }));
   } else { anyFailed = true; research = []; loadErrors.research = true; }
 
@@ -774,7 +776,7 @@ async function saveToSupabase() {
     const rows = [];
     ["generalist", "tradfi", "watchlist"].forEach(listName => {
       (data[listName] || []).forEach((x, i) => {
-        rows.push({ list_name: listName, rank: i + 1, token: x.token, name: x.name, narrative: x.narrative, status: x.status, cgid: x.cgid, note: x.note });
+        rows.push({ list_name: listName, rank: i + 1, token: x.token, name: x.name, narrative: x.narrative, status: x.status, cgid: x.cgid, note: x.note, latest_analysis_id: x.latestAnalysisId || null });
       });
     });
     const insRes = await fetch(REST + "conviction_items", {
@@ -821,7 +823,7 @@ function startEdit(listName, idx) { editingKey = listName + "-" + idx; movingKey
 function cancelEdit() { editingKey = null; renderActive(); }
 function saveEdit(listName, idx) {
   const f = document.getElementById("editform");
-  const fields = ["token","name","narrative","status","cgid","note"];
+  const fields = ["token","name","narrative","status","cgid","note","latestAnalysisId"];
   fields.forEach(k => { const el = f.querySelector(`[name=${k}]`); if (el) data[listName][idx][k] = el.value; });
   if (data[listName][idx].token) data[listName][idx].token = data[listName][idx].token.toUpperCase();
   editingKey = null;
@@ -934,6 +936,9 @@ function renderTokenCard(listName, x, i, total) {
   const chCls = ch == null ? "" : ch >= 0 ? "pos" : "neg";
 
   if (editingKey === key) {
+    const tokenAnalyses = (data.research || []).filter(a => a.token === x.token)
+      .sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
+    const analysisLabel = (a) => `${a.analysisDate} · ${a.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ Synthesis' : a.debateId ? '🗣 ' : ''}${a.analysisBy||'—'}`;
     return `<div class="editrow" id="editform">
       <div class="editgrid">
         <div><label>Token</label><input name="token" value="${x.token||""}" /></div>
@@ -949,6 +954,12 @@ function renderTokenCard(listName, x, i, total) {
           </select>
         </div>
         <div style="grid-column:span 2"><label>CoinGecko ID</label><input name="cgid" value="${x.cgid||""}" /></div>
+        <div style="grid-column:span 2"><label>Linked analysis</label>
+          <select name="latestAnalysisId">
+            <option value="" ${!x.latestAnalysisId?"selected":""}>— none —</option>
+            ${tokenAnalyses.map(a => `<option value="${a.id}" ${x.latestAnalysisId===a.id?"selected":""}>${analysisLabel(a)}</option>`).join("")}
+          </select>
+        </div>
       </div>
       <label>Notes</label><textarea name="note">${x.note||""}</textarea>
       <div style="display:flex;gap:6px;margin-top:10px">
@@ -1338,8 +1349,11 @@ function renderResearch() {
   const allResearch = data.research || [];
   document.getElementById("t-research").innerHTML = list.map(r => {
     const isOpen = expandedResearchIds.has(r.id);
+    const isSynthesis = r.analysisType === "DEBATE_SYNTHESIS";
     const badges = [];
     if (r.analysisType === "MIGRATED_CONVICTION_NOTE") badges.push(`<span class="inv-badge muted" title="Preserved research note migrated from the old conviction layer — not necessarily a full formal analysis">MIGRATED NOTE</span>`);
+    if (isSynthesis) badges.push(`<span class="inv-badge accumulate" title="The resolved synthesis of a formal AI debate — agreements, disagreements, and open questions, not an averaged score">⚖️ SYNTHESIS</span>`);
+    else if (r.debateId) badges.push(`<span class="inv-badge muted" title="One independent contribution to a formal AI debate on this token">🗣 DEBATE</span>`);
     if (r.status) badges.push(`<span class="inv-badge ${statusBadgeClass(r.status)}">${r.status}</span>`);
     if (r.conviction) badges.push(`<span class="inv-badge ${statusBadgeClass(r.conviction)}">${r.conviction} conviction</span>`);
     if (r.overallRating != null) badges.push(`<span class="inv-badge accumulate">${Number(r.overallRating).toFixed(1)}/10</span>`);
@@ -1366,7 +1380,7 @@ function renderResearch() {
 
     const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
 
-    return `<div class="inv-card ${isOpen?'open':''}" id="research-card-${r.id}">
+    return `<div class="inv-card ${isOpen?'open':''} ${isSynthesis?'synthesis':''}" id="research-card-${r.id}">
       <div class="inv-card-head" onclick="toggleResearchCard('${r.id}')">
         ${chip(r.token)}
         <div class="inv-card-main">
@@ -1395,7 +1409,7 @@ function renderResearch() {
         ${r.tags?.length ? `<div class="inv-field"><div class="lbl">Tags</div><div class="val">${r.tags.join(", ")}</div></div>` : ""}
         ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
         <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
-        ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType})`).join(", ")}</div></div>` : ""}
+        ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
       </div>
     </div>`;
   }).join("");
