@@ -294,6 +294,67 @@ viable slot identified for later is a small "🕐 history" link on each
 conviction card, reusing the same collapsible pattern already shipped for
 notes (`expandedNotes`), not a new tab or panel.
 
+### Atomic conviction persistence (CONFIRMED, added Phase 7A)
+
+**The problem this fixes (TD-001, identified in the Phase 7 audit):**
+`saveToSupabase()` previously replaced the three conviction lists as two
+separate REST calls — `DELETE` all rows, then `POST` the full new set. If
+the DELETE succeeded and the POST failed for any reason (network drop,
+closed tab, a Supabase hiccup), `conviction_items` was left genuinely
+empty for all three lists, with no automatic recovery.
+
+**The fix:** `public.replace_conviction_items(new_rows jsonb)` — a
+`plpgsql` function, `SECURITY INVOKER`, that performs the delete and the
+insert inside one function body. Postgres functions execute as a single
+transaction by default: an error anywhere inside aborts everything the
+function did. This is the first stored procedure/RPC in this project —
+every other operation is a plain PostgREST table call. The function is
+called via `POST /rest/v1/rpc/replace_conviction_items`, taking the exact
+same row-shape the client already built for the old direct INSERT.
+
+**Why `SECURITY INVOKER`, not `DEFINER`:** the function runs as whoever
+calls it, so the existing `"tarek only"` RLS policy on `conviction_items`
+applies exactly as it always has — no new policy needed, no privilege
+elevation introduced. `EXECUTE` is granted to `anon` and `authenticated`,
+matching the same blanket-grant-plus-RLS-enforcement pattern already used
+for every table in this schema.
+
+**Why `decision_log` insertion is deliberately NOT inside this
+transaction (Option A, not B):** bundling it in would mean a failure in
+the newer, less-proven logging path could block the more essential
+conviction save — the inverse of the standing principle from Phase 6C
+("failure to log must not prevent the conviction save, or vice versa").
+`decision_log` remains a separate, best-effort call after the RPC
+succeeds, completely unchanged from how it worked before this phase.
+
+**`UNIQUE (token, list_name)` on `conviction_items`,** added in the same
+migration as the function, not separately — and this ordering is a
+requirement, not a preference. Adding the constraint *before* the
+atomicity fix would have made the underlying failure mode worse: under
+the old two-call pattern, a duplicate-token bug hitting the constraint
+during INSERT would have failed *after* the DELETE already succeeded,
+leaving the table empty — the exact TD-001 failure, now with a new,
+plausible trigger for it. The constraint is only safe once replacement is
+atomic, because a violation then rolls back to the pre-save state, not to
+empty. Confirmed zero duplicates existed immediately before the migration
+was applied.
+
+**Verified directly against real production data, not simulated:**
+called the real deployed function with a row that violates the existing
+`status` CHECK constraint, confirmed the call failed, then compared a
+full content checksum of `conviction_items` (token + list_name + status +
+note for every row) before and after — identical, byte for byte. The
+DELETE that ran first inside the function was completely undone when the
+subsequent INSERT failed. This is empirical proof against the real table,
+not a simulation, with zero risk, since a correctly-rolled-back operation
+by definition leaves no trace to have gone wrong.
+
+**Application change:** `saveToSupabase()`'s conviction-persistence step
+is now one `fetch()` call to the RPC instead of two. `buildDecisionLogEvents()`,
+the `rows` construction, `savedData`, the dirty-state check, and all
+success/failure UI feedback are unchanged — verified byte-identical
+against the pre-change file.
+
 ### `potential_swaps` (CONFIRMED, 5 rows, live in dashboard's Opportunities tab as of Phase 4)
 
 A candidate rotation that hasn't been executed. Fields: `source_token`,
