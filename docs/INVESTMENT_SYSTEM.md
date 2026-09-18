@@ -9,11 +9,11 @@ Hierarchy" for the full ordering; this file occupies position 2 of 4, not
 position 1.
 
 Sections below are labeled CONFIRMED (verified live against Supabase on
-2026-09-18), INTENDED (designed but not yet built, or not yet wired into
-the dashboard), or UNVERIFIED (could not be checked from available
-tooling). Do not treat INTENDED as if it were CONFIRMED, and do not treat
-anything in this file as an assertion about current data — for that,
-query Supabase directly.
+2026-09-18, re-verified same day after Phase 4 dashboard work), INTENDED
+(designed but not yet built, or not yet wired into the dashboard), or
+UNVERIFIED (could not be checked from available tooling). Do not treat
+INTENDED as if it were CONFIRMED, and do not treat anything in this file
+as an assertion about current data — for that, query Supabase directly.
 
 ## Philosophy
 
@@ -56,25 +56,24 @@ current data, re-query Supabase — do not treat the numbers below as live.
 `project_context` (1 row) also exists — a free-text running-notes field,
 not part of the dashboard UI, used for chat-session continuity.
 
-### Tables that exist in Supabase but are NOT wired into the dashboard yet
+Three more tables were added to the dashboard in Phase 4 — see below.
 
-This is the most important gap in the system right now. Per
-`AGENTS.md`'s Source of Truth Hierarchy, Supabase being ahead of the
-dashboard here is a fact about current state (Supabase, position 1) that
-this document (position 2) is reporting on — not something this document
-resolves. **Documenting this gap is in scope; building the dashboard UI
-for it is not.**
+### Tables now wired into the dashboard as of Phase 4 (2026-09-18)
 
-| Table | Rows at verification | Gap |
+Updated from the original audit: `project_analysis`, `potential_swaps`,
+and `reminders` are now read (view-only) by the dashboard, in three new
+tabs — Research, Opportunities, and Catalysts — plus a compact Overview
+tab. This closes the gap the original Phase 1 audit flagged. Phase 4 did
+not add any write/edit/delete functionality for these three tables; that
+remains a possible future phase, not yet built.
+
+| Table | Rows at Phase-4 verification | Notes |
 |---|---|---|
-| `project_analysis` | 0 | Full schema built (see below). Zero rows recorded. No dashboard tab reads or writes it. |
-| `potential_swaps` | 5 | Schema built. 5 rows exist (all inserted 2026-09-18, all `status='WATCH'`, all `source_analysis_id`/`target_analysis_id` NULL — no linked analysis yet). No dashboard tab reads or writes it. |
-| `reminders` | 1 | Investment-specific reminders (unlocks/governance/catalysts) — distinct from `calendar_events`. 1 row (`MON` unlock, 2026-11-24, severity high). No dashboard tab reads or writes it. |
+| `project_analysis` | 20 | All 20 are `analysis_type = 'MIGRATED_CONVICTION_NOTE'` — preserved research notes migrated from the old conviction layer, not newly researched formal analyses. None have `overall_rating`, `conviction`, `bull_case`, or `bear_case` populated; all carry a `thesis` field. `analysis_by` on these reads "Historical dashboard note — attribution not fully verified" rather than a specific person/AI. |
+| `potential_swaps` | 5 | The ADA trim basket: 30% source sell on every row, `proceeds_share_pct` split 30/25/20/15/10 across CC/ZRO/NEAR/CELO/AKT (retaining 70% ADA), all `status='WATCH'`. `target_analysis_id` is populated for 4 of 5 (not CC, which has no resolvable project). **`source_analysis_id` is populated on none of the 5** — there is currently no analysis backing the ADA side of the trim. Narrative fields (thesis/why_now/trigger/invalidation/catalysts/risk_notes) are null on all 5 rows. |
+| `reminders` | 2 | ZRO cliff unlock (2026-09-19) and MON cliff unlock (2026-11-24), both `severity='high'`, both `status='OPEN'`, both fully populated including `action`, `details`, and `source_url`. |
 
-**Practical implication:** if you're asked to "check the reminders" or
-"look at potential swaps," the data lives in Supabase and is queryable via
-SQL, but nothing on the live dashboard currently shows it. Don't assume a
-user has seen this data just because it's "in the system."
+**"CC" remains intentionally unresolved** — the dashboard renders it as-is with a small "(ticker unresolved)" label. Nothing in this system should guess what it stands for.
 
 ### Confirmed live relationships (foreign keys)
 
@@ -83,8 +82,14 @@ user has seen this data just because it's "in the system."
 - `potential_swaps.target_analysis_id` → `project_analysis.id`
 - `project_analysis.supersedes_analysis_id` → `project_analysis.id` (self-referential — the versioning chain)
 
-All four exist as real FK constraints in the live schema, but since
-`project_analysis` has 0 rows, none are currently populated with a value.
+All four exist as real FK constraints in the live schema. Population as of
+Phase-4 verification: `conviction_items.latest_analysis_id` — 30 of 36
+populated. `potential_swaps.target_analysis_id` — 4 of 5 populated.
+`potential_swaps.source_analysis_id` — 0 of 5 populated (no analysis
+currently backs the ADA side of the trim basket).
+`project_analysis.supersedes_analysis_id` — 0 of 20 populated (every
+current row is first-generation; no analysis has yet been superseded by
+a later one).
 
 ### RLS pattern (CONFIRMED)
 
@@ -98,7 +103,7 @@ preferable for any new table going forward.
 
 ## Table Reference
 
-### `project_analysis` (CONFIRMED schema, 0 rows)
+### `project_analysis` (CONFIRMED, 20 rows, live in dashboard's Research tab as of Phase 4)
 
 The core research record. One row per analysis snapshot — not per token,
 since a token can and should accumulate multiple analyses over time as
@@ -130,20 +135,23 @@ Fields confirmed live:
 never be overwritten to reflect a re-evaluation. A new re-evaluation is a
 *new row*, linked via `supersedes_analysis_id` back to the one it replaces.
 This is a process rule, not something the database currently prevents —
-nothing stops an UPDATE from silently destroying history today. If this
-matters enough to enforce mechanically, that would need a trigger or an
-application-level convention; neither exists yet (UNVERIFIED whether this
-has been discussed elsewhere).
+nothing stops an UPDATE from silently destroying history today. Confirmed:
+all 20 current rows have `supersedes_analysis_id = null` — no analysis has
+been superseded yet, so this chain is untested in practice, not just
+unenforced. If this matters enough to enforce mechanically, that would
+need a trigger or an application-level convention; neither exists yet
+(UNVERIFIED whether this has been discussed elsewhere).
 
 ### `conviction_items` (CONFIRMED, 36 rows, live in dashboard)
 
 The current-state dashboard view — Generalist/TradFi/Watchlist lists.
-`latest_analysis_id` FK exists but is not currently populated for any row
-(consistent with `project_analysis` being empty). Once analyses start
-being recorded, this is the intended link from "current conviction" back
-to "the research that justifies it."
+`latest_analysis_id` is populated on 30 of 36 rows as of Phase 4. As of
+Phase 4, a card whose token has a linked analysis shows a small "🔬
+analysis" link that jumps to that analysis in the Research tab — the one
+piece of existing-card UI touched by Phase 4, purely additive (see
+`AGENTS.md`-referenced delivery notes for this phase).
 
-### `potential_swaps` (CONFIRMED, 5 rows, NOT live in dashboard)
+### `potential_swaps` (CONFIRMED, 5 rows, live in dashboard's Opportunities tab as of Phase 4)
 
 A candidate rotation that hasn't been executed. Fields: `source_token`,
 `target_token`, `status` (IDEA/WATCH/READY/EXECUTED/ABANDONED), `priority`
@@ -152,13 +160,20 @@ A candidate rotation that hasn't been executed. Fields: `source_token`,
 `catalysts`, `risk_notes`, `review_date`, `last_reviewed_at`, plus the two
 `*_analysis_id` links to `project_analysis`.
 
-Current 5 rows (at verification) are all `ADA → {CC, ZRO, NEAR, CELO, AKT}`,
-status `WATCH`, priorities 1–5, inserted as a batch on 2026-09-18. No
-conviction score or linked analysis set yet on any of them.
+Current 5 rows: the ADA trim basket — `ADA → CC` (priority 1, 30% proceeds
+share), `ADA → ZRO` (priority 2, 25%), `ADA → NEAR` (priority 3, 20%),
+`ADA → CELO` (priority 4, 15%), `ADA → AKT` (priority 5, 10%) — proceeds
+shares sum to 100%. `source_sell_pct` is 30% flat on every row (retaining
+70% ADA). All `status='WATCH'`. `target_analysis_id` is populated on 4 of
+5 (ZRO, NEAR, CELO, AKT — not CC, which has no resolvable project).
+`source_analysis_id` is null on all 5 — no analysis currently backs the
+ADA side. `conviction` and all narrative fields (thesis/why_now/trigger/
+invalidation/catalysts/risk_notes) are null on all 5 rows.
 
-**UNVERIFIED:** target_token `CC` on the first row — could not confirm
-whether this is a real ticker or a typo/placeholder. Don't assume either
-way; check with Tarek or search before treating it as a real asset.
+**UNVERIFIED:** target_token `CC` — could not confirm whether this is a
+real ticker or a typo/placeholder. The dashboard renders it as-is with an
+"(unresolved ticker)" label rather than guessing. Don't assume either way;
+check with Tarek or search before treating it as a real asset.
 
 ### `rotations` + `rotation_basket_items` (CONFIRMED, live in dashboard)
 
@@ -167,14 +182,16 @@ rows: FLR, CFG, XPL→CFG, ONDO→CFG) holds what was sold; each row's basket
 of what was bought lives in `rotation_basket_items` (11 rows). Fully live
 in the dashboard's Rotations tab, including a buyback-comparison feature.
 
-### `reminders` (CONFIRMED, 1 row, NOT live in dashboard)
+### `reminders` (CONFIRMED, 2 rows, live in dashboard's Catalysts tab as of Phase 4)
 
 Investment-specific catalysts/deadlines — distinct from the general
 `calendar_events` table. `reminder_type` enum: UNLOCK, GOVERNANCE,
 CATALYST, REVIEW, DEADLINE, OTHER. `severity`: high/medium/low. `status`:
 OPEN/DONE/DISMISSED/SNOOZED. Supports `recurrence_rule` and `snooze_until`
-for recurring or deferred reminders. Current single row (at verification):
-a MON token unlock flagged high-severity for 2026-11-24.
+for recurring or deferred reminders. Current 2 rows, both `severity='high'`
+and `status='OPEN'`: a ZRO cliff unlock (event 2026-09-19) and a MON cliff
+unlock (event 2026-11-24), both with fully populated `action`, `details`,
+and `source_url` fields.
 
 ### `portfolio_holdings`, `calendar_events`, `open_items`, `multi_ai_rounds`, `multi_ai_rankings`, `project_context`
 
@@ -224,10 +241,17 @@ whoever (human or agent) is operating on the system following them.
   rather than guessed at.
 - Whether `supersedes_analysis_id` non-overwrite behavior is meant to be
   enforced by a trigger eventually, or stays a human/agent convention
-  indefinitely.
-- Whether the dashboard is intended to eventually grow tabs for
-  Analysis/Potential Swaps/Reminders, or whether those are meant to stay
-  Supabase/SQL-only workflows. Described as a current gap, not a plan.
+  indefinitely. Confirmed only that it's currently unused (0 of 20 rows).
 - `framework_version`'s intended versioning path — the column exists with
   a default of `'v1'`, but no v2 or migration logic exists anywhere
   checkable.
+
+## Known gap, not unverified — stated plainly
+
+Phase 4 (2026-09-18) added view-only dashboard access to `project_analysis`,
+`potential_swaps`, and `reminders`. It did **not** add any create/edit/
+delete UI for these three tables — recording a new analysis, adding a
+swap candidate, or resolving a reminder still requires direct SQL access
+(e.g., via an agent with a Supabase connection) rather than the dashboard
+itself. Whether that remains permanent or becomes a future phase is an
+open product decision, not something this document resolves.
