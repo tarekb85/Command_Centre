@@ -759,12 +759,90 @@ function discardChanges() {
   toast("Discarded");
 }
 
+// Diffs the last-synced state against the current in-memory state to derive
+// decision_log events. Pure function, no side effects, no network calls —
+// called from saveToSupabase() before anything is mutated. Identity is
+// (token, list_name), never conviction_items.id, since that id is not
+// stable across saves (every save deletes+reinserts all conviction rows).
+function buildDecisionLogEvents(oldState, newState) {
+  const LISTS = ["generalist", "tradfi", "watchlist"];
+  const oldEntries = [], newEntries = [];
+  LISTS.forEach(list => {
+    (oldState?.[list] || []).forEach(item => { if (item.token) oldEntries.push({ list, token: item.token, item }); });
+    (newState?.[list] || []).forEach(item => { if (item.token) newEntries.push({ list, token: item.token, item }); });
+  });
+
+  const events = [];
+  const matchedOld = new Set(), matchedNew = new Set();
+
+  // Pass 1: exact (token, list) matches. Done first and independently per
+  // list so a token present in two lists at once (confirmed real — ZRO is
+  // in both generalist and tradfi today) is compared against its own list's
+  // prior state only, never against the other list's entry.
+  oldEntries.forEach((o, oi) => {
+    const ni = newEntries.findIndex((n, idx) => !matchedNew.has(idx) && n.token === o.token && n.list === o.list);
+    if (ni === -1) return;
+    matchedOld.add(oi); matchedNew.add(ni);
+    const n = newEntries[ni];
+    if ((o.item.status || null) !== (n.item.status || null)) {
+      events.push({ token: o.token, list_name: o.list, event_type: "STATUS_CHANGE",
+        old_status: o.item.status || null, new_status: n.item.status || null,
+        reason: n.item.note || null, linked_analysis_id: n.item.latestAnalysisId || null });
+      return;
+    }
+    const noteChanged = (o.item.note || "") !== (n.item.note || "");
+    const analysisChanged = (o.item.latestAnalysisId || null) !== (n.item.latestAnalysisId || null);
+    if (noteChanged || analysisChanged) {
+      events.push({ token: o.token, list_name: o.list, event_type: "REASONING_UPDATE",
+        old_status: o.item.status || null, new_status: n.item.status || null,
+        reason: n.item.note || null, linked_analysis_id: n.item.latestAnalysisId || null });
+    }
+    // else: no meaningful field change (e.g. pure reorder) — no event.
+  });
+
+  // Pass 2: for old entries with no exact-list match, look for the same
+  // token surfacing under a DIFFERENT list -> MOVED (checked, and captures
+  // any simultaneous status change too, before ever falling back to
+  // REMOVED). Only if no such pairing exists is it a genuine REMOVED.
+  oldEntries.forEach((o, oi) => {
+    if (matchedOld.has(oi)) return;
+    const ni = newEntries.findIndex((n, idx) => !matchedNew.has(idx) && n.token === o.token);
+    if (ni !== -1) {
+      matchedOld.add(oi); matchedNew.add(ni);
+      const n = newEntries[ni];
+      events.push({ token: o.token, list_name: n.list, event_type: "MOVED",
+        old_status: o.item.status || null, new_status: n.item.status || null,
+        reason: `Moved from ${o.list} to ${n.list}.${n.item.note ? " " + n.item.note : ""}`,
+        linked_analysis_id: n.item.latestAnalysisId || null });
+    } else {
+      events.push({ token: o.token, list_name: o.list, event_type: "REMOVED",
+        old_status: o.item.status || null, new_status: null,
+        reason: o.item.note || null, linked_analysis_id: o.item.latestAnalysisId || null });
+    }
+  });
+
+  // Pass 3: whatever's left unmatched on the new side genuinely didn't
+  // exist before, in any list -> INITIAL.
+  newEntries.forEach((n, ni) => {
+    if (matchedNew.has(ni)) return;
+    events.push({ token: n.token, list_name: n.list, event_type: "INITIAL",
+      old_status: null, new_status: n.item.status || null,
+      reason: n.item.note || null, linked_analysis_id: n.item.latestAnalysisId || null });
+  });
+
+  return events;
+}
+
 async function saveToSupabase() {
   const sb = document.getElementById("savebar");
   const btns = sb.querySelectorAll("button");
   btns.forEach(b => b.disabled = true);
   toast("Saving to Supabase…");
   try {
+    // Computed here, before anything is deleted or reinserted, while
+    // savedData still reflects the last-synced state.
+    const decisionEvents = buildDecisionLogEvents(savedData, data);
+
     // Only the three conviction lists are editable in this UI. Save = replace
     // those rows wholesale (delete + reinsert current order), same semantics
     // as the old "rewrite the whole gist file" model, just scoped to one table.
@@ -785,6 +863,23 @@ async function saveToSupabase() {
       body: JSON.stringify(rows)
     });
     if (!insRes.ok) throw new Error("insert failed: HTTP " + insRes.status);
+
+    // Conviction save succeeded — now persist what actually happened.
+    // decision_log is append-only: no update/delete path exists for it
+    // anywhere in this dashboard. A failure here is logged but never rolls
+    // back or blocks the conviction save that already succeeded above.
+    if (decisionEvents.length > 0) {
+      try {
+        const logRes = await fetch(REST + "decision_log", {
+          method: "POST",
+          headers: sbHeaders({ Prefer: "return=minimal" }),
+          body: JSON.stringify(decisionEvents)
+        });
+        if (!logRes.ok) console.warn("decision_log insert failed: HTTP " + logRes.status);
+      } catch (logErr) {
+        console.warn("decision_log insert failed:", logErr);
+      }
+    }
 
     savedData = JSON.parse(JSON.stringify(data));
     refreshSaveBar();
