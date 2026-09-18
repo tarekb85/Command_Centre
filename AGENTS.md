@@ -22,12 +22,16 @@ When any of these disagree, resolve in this order:
    any of the above. A prior conversation's summary of the system is not a
    substitute for checking 1–3 directly.
 
-This ordering matters concretely right now: Supabase is currently *ahead*
-of the dashboard. `project_analysis`, `potential_swaps`, and `reminders`
-exist live in the database but are not fetched or rendered by the deployed
-dashboard at all. See `docs/INVESTMENT_SYSTEM.md` for the full picture —
-this gap is documented, not hidden, but it is not this task's job to close
-it.
+This ordering mattered concretely on 2026-09-18: Supabase had `project_
+analysis`, `potential_swaps`, and `reminders` built with real data while
+the dashboard fetched none of them — a live example of Supabase being
+ahead of the code. Phase 4 (2026-09-18) closed that specific gap by adding
+view-only Research/Opportunities/Catalysts tabs. The general risk this
+illustrates still applies going forward: **check what the dashboard code
+actually fetches, don't assume from this file or from `docs/
+INVESTMENT_SYSTEM.md`** — the next gap of this kind won't announce itself
+either. See `docs/INVESTMENT_SYSTEM.md` for current per-table wiring
+status.
 
 ## Before you change anything
 
@@ -40,11 +44,16 @@ it.
    Analyse → Record → Conviction → Potential Swap → Execute → Review
    lifecycle this system is built around, and which parts of that lifecycle
    are actually wired into the dashboard vs. schema-only.
-3. **Never assume the dashboard UI reflects the full schema.** As of this
-   writing, three tables (`project_analysis`, `potential_swaps`,
-   `reminders`) exist in Supabase with real data but are not fetched or
-   rendered by the deployed dashboard at all. Don't assume a table's
-   existence means it's in use.
+3. **Never assume the dashboard UI reflects the full schema — check the
+   code, every time.** As of 2026-09-18, `project_analysis`,
+   `potential_swaps`, and `reminders` are fetched (view-only) by the
+   Research/Opportunities/Catalysts tabs — but none of the three have
+   create/edit/delete UI yet; recording an analysis or resolving a
+   reminder still requires direct SQL. A table's existence, or even its
+   presence in a fetch call, doesn't tell you what operations the UI
+   actually supports. Check `docs/INVESTMENT_SYSTEM.md`'s Current Known
+   State section for the latest per-table wiring status, and re-verify
+   against the live code if it matters.
 
 ## Deployment
 
