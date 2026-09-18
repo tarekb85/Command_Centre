@@ -867,25 +867,22 @@ async function saveToSupabase() {
     const decisionEvents = buildDecisionLogEvents(savedData, data);
 
     // Only the three conviction lists are editable in this UI. Save = replace
-    // those rows wholesale (delete + reinsert current order), same semantics
-    // as the old "rewrite the whole gist file" model, just scoped to one table.
-    const delRes = await fetch(REST + "conviction_items?list_name=in.(generalist,tradfi,watchlist)", {
-      method: "DELETE", headers: sbHeaders()
-    });
-    if (!delRes.ok) throw new Error("delete failed: HTTP " + delRes.status);
-
+    // those rows wholesale (delete + reinsert current order). This now runs
+    // as one atomic call via replace_conviction_items() (Phase 7A) instead of
+    // a separate DELETE then POST — a failure partway through no longer risks
+    // leaving conviction_items empty (TD-001, identified in the Phase 7 audit).
     const rows = [];
     ["generalist", "tradfi", "watchlist"].forEach(listName => {
       (data[listName] || []).forEach((x, i) => {
         rows.push({ list_name: listName, rank: i + 1, token: x.token, name: x.name, narrative: x.narrative, status: x.status, cgid: x.cgid, note: x.note, latest_analysis_id: x.latestAnalysisId || null });
       });
     });
-    const insRes = await fetch(REST + "conviction_items", {
+    const rpcRes = await fetch(REST + "rpc/replace_conviction_items", {
       method: "POST",
       headers: sbHeaders({ Prefer: "return=minimal" }),
-      body: JSON.stringify(rows)
+      body: JSON.stringify({ new_rows: rows })
     });
-    if (!insRes.ok) throw new Error("insert failed: HTTP " + insRes.status);
+    if (!rpcRes.ok) throw new Error("conviction replace failed: HTTP " + rpcRes.status);
 
     // Conviction save succeeded — now persist what actually happened.
     // decision_log is append-only: no update/delete path exists for it
