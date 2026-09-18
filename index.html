@@ -27,6 +27,8 @@
   .tabs{display:flex;gap:3px;background:#161618;border-radius:11px;padding:4px;margin:18px 0 14px;flex-wrap:wrap}
   .tab{padding:8px 13px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:var(--dim);font-weight:600;font-size:12.5px;font-family:inherit;display:flex;align-items:center;gap:5px}
   .tab.on{background:#27272a;color:#fafafa;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+  .sub-tabs{margin-top:-8px}
+  .tab.sub{font-size:11.5px;padding:6px 11px}
   .tab .ct{font-size:10px;color:var(--dim);background:#0a0a0b;border-radius:4px;padding:1px 5px}
   .tab.on .ct{color:#a1a1aa}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 14px;overflow-x:auto}
@@ -245,22 +247,34 @@
   </div>
 
   <!-- TABS -->
-  <div class="tabs" id="tabs">
-    <button class="tab on" data-t="generalist">🎯 Generalist <span class="ct" id="ct-generalist"></span></button>
-    <button class="tab" data-t="tradfi">🏛️ TradFi <span class="ct" id="ct-tradfi"></span></button>
-    <button class="tab" data-t="watchlist">👁 Watchlist <span class="ct" id="ct-watchlist"></span></button>
-    <button class="tab" data-t="portfolio">💼 Portfolio</button>
-    <button class="tab" data-t="rotations">🔄 Rotations</button>
-    <button class="tab" data-t="calendar">📅 Calendar</button>
-    <button class="tab" data-t="open">📋 Open Items</button>
-    <button class="tab" data-t="overview">🧭 Overview</button>
-    <button class="tab" data-t="research">🔬 Research <span class="ct" id="ct-research"></span></button>
-    <button class="tab" data-t="swaps">🔀 Opportunities <span class="ct" id="ct-swaps"></span></button>
-    <button class="tab" data-t="catalysts">⏰ Catalysts <span class="ct" id="ct-catalysts"></span></button>
+  <div class="tabs" id="primary-tabs">
+    <button class="tab on" data-primary="overview" onclick="selectPrimary('overview')">🧭 Overview</button>
+    <button class="tab" data-primary="conviction" onclick="selectPrimary('conviction')">🎯 Conviction</button>
+    <button class="tab" data-primary="holdings" onclick="selectPrimary('holdings')">💼 Holdings</button>
+    <button class="tab" data-primary="research" onclick="selectPrimary('research')">🔬 Research</button>
+    <button class="tab" data-primary="schedule" onclick="selectPrimary('schedule')">📅 Schedule</button>
+  </div>
+
+  <div class="tabs sub-tabs" data-subbar="conviction" style="display:none">
+    <button class="tab sub on" data-sub="generalist" onclick="selectSub('conviction','generalist')">🎯 Generalist <span class="ct" id="ct-generalist"></span></button>
+    <button class="tab sub" data-sub="tradfi" onclick="selectSub('conviction','tradfi')">🏛️ TradFi <span class="ct" id="ct-tradfi"></span></button>
+    <button class="tab sub" data-sub="watchlist" onclick="selectSub('conviction','watchlist')">👁 Watchlist <span class="ct" id="ct-watchlist"></span></button>
+  </div>
+  <div class="tabs sub-tabs" data-subbar="holdings" style="display:none">
+    <button class="tab sub on" data-sub="portfolio" onclick="selectSub('holdings','portfolio')">💼 Portfolio</button>
+    <button class="tab sub" data-sub="rotations" onclick="selectSub('holdings','rotations')">🔄 Rotations</button>
+  </div>
+  <div class="tabs sub-tabs" data-subbar="research" style="display:none">
+    <button class="tab sub on" data-sub="research" onclick="selectSub('research','research')">🔬 Research <span class="ct" id="ct-research"></span></button>
+    <button class="tab sub" data-sub="swaps" onclick="selectSub('research','swaps')">🔀 Opportunities <span class="ct" id="ct-swaps"></span></button>
+  </div>
+  <div class="tabs sub-tabs" data-subbar="schedule" style="display:none">
+    <button class="tab sub on" data-sub="calendar" onclick="selectSub('schedule','calendar')">📅 Calendar</button>
+    <button class="tab sub" data-sub="catalysts" onclick="selectSub('schedule','catalysts')">⏰ Catalysts <span class="ct" id="ct-catalysts"></span></button>
   </div>
 
   <!-- LIST PANELS (generalist, tradfi, watchlist) -->
-  <div class="panel" data-panel="generalist">
+  <div class="panel" data-panel="generalist" style="display:none">
     <div class="note indigo"><b>Claude's A+++ Generalist Stack</b> — ranked on value capture. <em>Click any token to edit, reorder, or move between lists.</em></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <button class="btn btn-primary" onclick="openAdd('generalist')">+ Add token</button>
@@ -310,12 +324,13 @@
 
   <!-- OPEN ITEMS -->
   <div class="panel" data-panel="open" style="display:none">
+    <div style="margin-bottom:8px"><a class="analysis-link" onclick="navigateTo('overview')">← Overview</a></div>
     <div class="note red"><b>Open items / pending decisions</b></div>
     <div id="t-open"></div>
   </div>
 
   <!-- OVERVIEW -->
-  <div class="panel" data-panel="overview" style="display:none">
+  <div class="panel" data-panel="overview">
     <div id="t-overview"></div>
   </div>
 
@@ -529,7 +544,10 @@ const SEED = {
 let savedData = null;     // last known synced state (from gist or seed)
 let data = null;          // current working state (may have unsaved edits)
 let prices = {};
-let activeTab = "generalist";
+let activeTab = "overview";
+let activePrimary = "overview";
+let activeSubFor = { conviction: "generalist", holdings: "portfolio", research: "research", schedule: "calendar" };
+const SUBBED_PRIMARIES = new Set(["conviction", "holdings", "research", "schedule"]);
 let editingKey = null;    // "listName-index" when editing
 let movingKey = null;     // "listName-index" when picking target list
 
@@ -1209,9 +1227,7 @@ function toggleSwapTarget(swapId) {
 }
 function goToAnalysis(analysisId) {
   if (!analysisId) return;
-  activeTab = "research";
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.t === "research"));
-  document.querySelectorAll("[data-panel]").forEach(p => p.style.display = p.dataset.panel === "research" ? "" : "none");
+  navigateTo("research", "research");
   expandedResearchIds.add(analysisId);
   renderResearch();
   setTimeout(() => {
@@ -1288,6 +1304,9 @@ function renderOverview() {
     <div class="ov-highlight">
       <div class="lbl">🔥 Needs attention</div>
       ${dqHtml}
+    </div>
+    <div style="text-align:right;margin:-2px 0 4px">
+      <a class="analysis-link" onclick="navigateTo('open')">📋 Open Items (${data.openItems?.length||0}) →</a>
     </div>
     <div class="note amber" style="margin-top:4px">This is an investment-memory / decision-support view, not a price ticker — figures above reflect research and process state, not live market prices, and nothing here is a trade instruction.</div>
   `;
@@ -1478,15 +1497,29 @@ function renderActive() {
 /* ============================================================
    TABS / EVENTS
    ============================================================ */
-document.getElementById("tabs").addEventListener("click", e => {
-  const b = e.target.closest(".tab"); if (!b) return;
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("on"));
-  b.classList.add("on");
-  activeTab = b.dataset.t;
-  document.querySelectorAll("[data-panel]").forEach(p => p.style.display = p.dataset.panel === activeTab ? "" : "none");
+function showPanel(panelId) {
+  document.querySelectorAll("[data-panel]").forEach(p => p.style.display = p.dataset.panel === panelId ? "" : "none");
+}
+function renderNavState() {
+  const visualPrimary = activePrimary === "open" ? "overview" : activePrimary;
+  document.querySelectorAll("#primary-tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.primary === visualPrimary));
+  document.querySelectorAll("[data-subbar]").forEach(bar => bar.style.display = bar.dataset.subbar === activePrimary ? "flex" : "none");
+  if (SUBBED_PRIMARIES.has(activePrimary)) {
+    document.querySelectorAll(`[data-subbar="${activePrimary}"] .tab`).forEach(t => t.classList.toggle("on", t.dataset.sub === activeSubFor[activePrimary]));
+  }
+}
+function navigateTo(primaryId, subId) {
+  activePrimary = primaryId;
+  if (subId) activeSubFor[primaryId] = subId;
+  activeTab = SUBBED_PRIMARIES.has(primaryId) ? activeSubFor[primaryId] : primaryId;
+  renderNavState();
+  showPanel(activeTab);
   editingKey = null; movingKey = null;
   renderActive();
-});
+}
+function selectPrimary(primaryId) { navigateTo(primaryId); }
+function selectSub(primaryId, subId) { navigateTo(primaryId, subId); }
+
 document.getElementById("refresh").addEventListener("click", fetchPrices);
 document.getElementById("reload").addEventListener("click", () => {
   if (isDirty() && !confirm("You have unsaved changes. Reload will discard them. Continue?")) return;
