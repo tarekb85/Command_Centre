@@ -199,6 +199,16 @@
   .swap-src.open .swap-src-chevron{transform:rotate(90deg)}
   .swap-src-body{display:none;padding:10px 12px 12px}
   .swap-src.open .swap-src-body{display:block}
+
+  /* Decision Queue (Overview) */
+  .dq-row{display:flex;align-items:flex-start;gap:10px;background:#161618;border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:6px}
+  .dq-type{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:4px;flex-shrink:0;margin-top:2px}
+  .dq-type.catalyst{background:#ef444422;color:var(--red)}
+  .dq-type.opportunity{background:#6366f122;color:var(--indigo)}
+  .dq-body{flex:1;min-width:0}
+  .dq-title{font-weight:600;font-size:13px;color:#f4f4f5}
+  .dq-why{font-size:11px;color:var(--dim);margin-top:2px}
+  .dq-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center}
 </style>
 </head>
 <body>
@@ -1219,8 +1229,54 @@ function renderOverview() {
   const openSwaps = swaps.filter(s => !["EXECUTED","ABANDONED"].includes(s.status));
   const openCatalysts = catalysts.filter(c => c.status === "OPEN").sort((a,b) => new Date(a.eventAt) - new Date(b.eventAt));
   const linkedConviction = ["generalist","tradfi","watchlist"].reduce((sum,l) => sum + (data[l]||[]).filter(x => x.latestAnalysisId).length, 0);
-  const topSwaps = [...openSwaps].sort((a,b) => (a.priority??99) - (b.priority??99)).slice(0,3);
-  const nextCatalyst = openCatalysts[0];
+
+  // Look up real conviction state for a token, if it exists anywhere in the
+  // three lists — returns null (not a fabricated "no data" badge) when the
+  // token isn't tracked. Cross-listed tokens (e.g. ZRO in both generalist
+  // and tradfi) are expected to agree; the first match is used.
+  function lookupConviction(token) {
+    for (const l of ["generalist","tradfi","watchlist"]) {
+      const hit = (data[l]||[]).find(x => x.token === token);
+      if (hit) return { status: hit.status, latestAnalysisId: hit.latestAnalysisId };
+    }
+    return null;
+  }
+
+  // --- Decision Queue: only two real signals exist in the data today ---
+  // (1) an open reminder, (2) a source with at least one non-terminal swap.
+  // Conviction status and a research link are attached only when that
+  // token genuinely has one — never inferred or defaulted.
+  const catalystQueueItems = openCatalysts.map(c => {
+    const conv = lookupConviction(c.token);
+    return { type: "catalyst", token: c.token, title: c.title,
+      why: `${c.severity.toUpperCase()} severity · ${c.reminderType} · ${fmtDaysUntil(c.eventAt)}`,
+      conviction: conv?.status || null, analysisId: conv?.latestAnalysisId || null };
+  });
+
+  const swapGroups = {};
+  const swapOrder = [];
+  openSwaps.forEach(s => { if (!(s.sourceToken in swapGroups)) { swapGroups[s.sourceToken] = []; swapOrder.push(s.sourceToken); } swapGroups[s.sourceToken].push(s); });
+  const opportunityQueueItems = swapOrder.map(src => {
+    const items = swapGroups[src];
+    const conv = lookupConviction(src);
+    return { type: "opportunity", token: src, title: `${src} rotation basket`,
+      why: `${items.length} active target${items.length===1?"":"s"} under consideration`,
+      conviction: conv?.status || null, analysisId: conv?.latestAnalysisId || null };
+  });
+
+  const dqItems = [...catalystQueueItems, ...opportunityQueueItems];
+  const dqHtml = dqItems.length ? dqItems.map(it => `
+    <div class="dq-row">
+      <span class="dq-type ${it.type}">${it.type}</span>
+      <div class="dq-body">
+        <div class="dq-title">${chip(it.token)} ${it.title}</div>
+        <div class="dq-why">${it.why}</div>
+        <div class="dq-meta">
+          ${it.conviction ? `<span class="inv-badge ${statusBadgeClass(it.conviction)}">${it.conviction}</span>` : ""}
+          ${it.analysisId ? `<a class="analysis-link" onclick="goToAnalysis('${it.analysisId}')">🔬 view analysis</a>` : ""}
+        </div>
+      </div>
+    </div>`).join("") : `<div class="inv-empty">Nothing currently needs attention.</div>`;
 
   document.getElementById("t-overview").innerHTML = `
     <div class="cards">
@@ -1230,24 +1286,10 @@ function renderOverview() {
       <div class="card"><div class="lbl">Linked conviction records</div><div class="val">${linkedConviction} <span style="font-size:12px;color:var(--dim)">/ ${(data.generalist?.length||0)+(data.tradfi?.length||0)+(data.watchlist?.length||0)}</span></div></div>
     </div>
     <div class="ov-highlight">
-      <div class="lbl">Highest-priority swap candidates</div>
-      ${topSwaps.length ? topSwaps.map(s => `
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-          <span class="swap-flow" style="font-size:13px">${chip(s.sourceToken)}<span class="swap-arrow">→</span>${chip(s.targetToken)}</span>
-          <span class="inv-badge ${statusBadgeClass(s.status)}">${s.status}</span>
-          <span style="font-size:11px;color:var(--dim)">priority ${s.priority ?? "—"}</span>
-        </div>`).join("") : `<div class="inv-empty">No open swap candidates.</div>`}
+      <div class="lbl">🔥 Needs attention</div>
+      ${dqHtml}
     </div>
-    <div class="ov-highlight">
-      <div class="lbl">Next important catalyst</div>
-      ${nextCatalyst ? `
-        <div style="display:flex;align-items:center;gap:10px">
-          ${chip(nextCatalyst.token)}
-          <div style="flex:1"><b>${nextCatalyst.title}</b><div style="font-size:11px;color:var(--dim)">${nextCatalyst.reminderType} · ${fmtDaysUntil(nextCatalyst.eventAt)}</div></div>
-          <span class="inv-badge ${statusBadgeClass(nextCatalyst.severity)}">${nextCatalyst.severity}</span>
-        </div>` : `<div class="inv-empty">No open reminders.</div>`}
-    </div>
-    <div class="note amber" style="margin-top:4px">This is an investment-memory / decision-support view, not a price ticker — figures above reflect research and process state, not live market prices.</div>
+    <div class="note amber" style="margin-top:4px">This is an investment-memory / decision-support view, not a price ticker — figures above reflect research and process state, not live market prices, and nothing here is a trade instruction.</div>
   `;
 }
 
