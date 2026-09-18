@@ -194,6 +194,106 @@ analysis" link that jumps to that analysis in the Research tab — the one
 piece of existing-card UI touched by Phase 4, purely additive (see
 `AGENTS.md`-referenced delivery notes for this phase).
 
+**A sharp characteristic worth knowing, surfaced by Phase 6C:**
+`conviction_items.id` is not stable across saves. `saveToSupabase()`
+deletes every row across all three lists and reinserts the entire current
+state on every save, so every row gets a fresh UUID and fresh
+`created_at`/`updated_at` each time — even for tokens whose fields didn't
+change. Anything that needs to reference a *specific* conviction position
+over time (see `decision_log` below) must use `(token, list_name)` as the
+identity, never `conviction_items.id`.
+
+### `decision_log` (CONFIRMED, added Phase 6C — historical decision record)
+
+Preserves the evolution of Tarek's actual conviction decisions over time
+— something `conviction_items` structurally cannot do, since it's
+deliberately the single *current*-state table. Append-only: no
+update/delete path exists for it anywhere in the dashboard, matching the
+same "preserve reasoning, never overwrite" convention already applied to
+`project_analysis`.
+
+Fields:
+- `id` (uuid, PK)
+- `token` (text, NOT NULL)
+- `list_name` (text, NOT NULL, CHECK: generalist/tradfi/watchlist —
+  same constraint as `conviction_items`)
+- `event_type` (text, NOT NULL, CHECK: INITIAL / STATUS_CHANGE /
+  REASONING_UPDATE / REMOVED / MOVED)
+- `old_status`, `new_status` (text, nullable, no CHECK — free text, since
+  a status value here is a historical snapshot, not a live constrained
+  field)
+- `reason` (text, nullable) — a *snapshot* of `conviction_items.note` at
+  the moment of the event, not a separately-typed justification. Tarek
+  doesn't have to write anything new for a decision to be logged; the
+  note he already writes when changing conviction is captured as-is.
+- `linked_analysis_id` (uuid, nullable, FK → `project_analysis(id)` ON
+  DELETE SET NULL) — a *snapshot* of `latest_analysis_id` at that moment,
+  not a live pointer. This is what lets you later ask "what evidence
+  justified the *July* HOLD" even after `latest_analysis_id` has since
+  moved on to a newer analysis.
+- `decided_at` (timestamptz, NOT NULL, default now())
+
+**Index:** `(token, decided_at DESC)` only — mirrors the exact pattern
+already used for `idx_project_analysis_token_date`. No index on
+`list_name` or `event_type`; add one later only if a concrete query
+pattern justifies it, per this schema's established discipline.
+
+**How events are detected — centrally, not per-action:** every
+individual conviction mutation in the dashboard (`cycleStatus`,
+`saveEdit`, `moveUp`/`moveDown`, `moveToList`, `deleteItem`,
+`confirmAdd`) is purely in-memory — none of them write to Supabase
+directly. Only `saveToSupabase()` does. Event detection happens once,
+centrally, inside `saveToSupabase()`, by diffing `savedData` (the
+last-synced snapshot, already tracked for the dirty-indicator) against
+the current `data`, immediately before the existing conviction
+delete/reinsert runs. This means **none of the individual mutator
+functions needed to change** — only `saveToSupabase()` did.
+
+**Event classification, in priority order:**
+1. Exact `(token, list_name)` match in both old and new state → compare
+   `status` first (→ `STATUS_CHANGE` if different), then `note` /
+   `latest_analysis_id` (→ `REASONING_UPDATE` if either differs). No
+   difference at all (e.g. a pure reorder) → no event.
+2. A token whose old `(token, list_name)` has no exact match, but the
+   same token appears elsewhere in the new state under a *different*
+   list → `MOVED`, with the destination as `list_name` and both the
+   origin and destination named in `reason`. Checked *before* falling
+   back to "removed" — a token moving between lists is never
+   double-counted as `REMOVED` in the old list plus `INITIAL` in the new
+   one. A simultaneous status change during a move is still classified
+   as `MOVED` (not `STATUS_CHANGE`), with the status transition captured
+   in `old_status`/`new_status` so nothing is lost.
+3. Anything left over on the old side with no pairing at all → `REMOVED`.
+4. Anything left over on the new side with no pairing at all → `INITIAL`.
+
+**Why exact-list matching has to happen first, per list, independently:**
+a token can exist in two lists simultaneously — confirmed real, not
+hypothetical: ZRO exists in both `generalist` and `tradfi` today, same
+status, genuinely different note text between the two. An earlier version
+of this logic keyed purely by token and silently let one list's entry
+overwrite the other's during diffing; the ZRO case is exactly what
+caught it before this shipped.
+
+**Write ordering:** the diff is computed *before* the conviction
+delete/reinsert (while `savedData` still reflects pre-save state), but
+the `decision_log` insert itself happens *after* the conviction save
+succeeds — so a decision is only ever logged once it's genuinely been
+committed. A `decision_log` insert failure is logged to console but never
+blocks or rolls back the conviction save that already succeeded.
+
+**Relationship to `supersedes_analysis_id` / `latest_analysis_id`:** two
+separate historical threads that intersect but don't merge.
+`supersedes_analysis_id` chains *analyses* to each other over time (this
+is `project_analysis`'s own versioning). `decision_log` chains
+*conviction status changes* to each other over time. `latest_analysis_id`
+stays the live current pointer; `decision_log.linked_analysis_id` is a
+frozen record of what it *was* at each past decision.
+
+**No UI yet.** This phase is data-path only, deliberately — the minimum
+viable slot identified for later is a small "🕐 history" link on each
+conviction card, reusing the same collapsible pattern already shipped for
+notes (`expandedNotes`), not a new tab or panel.
+
 ### `potential_swaps` (CONFIRMED, 5 rows, live in dashboard's Opportunities tab as of Phase 4)
 
 A candidate rotation that hasn't been executed. Fields: `source_token`,
