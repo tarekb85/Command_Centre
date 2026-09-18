@@ -144,6 +144,48 @@
   .roty-details summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
   .roty-details[open] summary::before{transform:rotate(90deg)}
   .roty-details[open] summary{color:var(--mut);margin-bottom:4px}
+
+  /* Investment memory layer: Overview / Research / Opportunities / Catalysts */
+  .inv-search{width:100%;background:#161618;border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--txt);font-family:inherit;font-size:13px;margin-bottom:12px;outline:none}
+  .inv-search:focus{border-color:var(--indigo)}
+  .inv-card{background:#161618;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;overflow:hidden}
+  .inv-card-head{padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none}
+  .inv-card-head:hover{background:#1c1c1f}
+  .inv-card-main{flex:1;min-width:0}
+  .inv-badge{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .inv-badge.muted{background:#27272a;color:var(--mut)}
+  .inv-badge.watch{background:#f59e0b22;color:var(--amber);border:1px solid #f59e0b55}
+  .inv-badge.hold{background:#6366f122;color:var(--indigo);border:1px solid #6366f155}
+  .inv-badge.accumulate{background:#10b98122;color:var(--green);border:1px solid #10b98155}
+  .inv-badge.exit,.inv-badge.high{background:#ef444422;color:var(--red);border:1px solid #ef444455}
+  .inv-badge.ready{background:#8b5cf622;color:var(--violet);border:1px solid #8b5cf655}
+  .inv-badge.executed{background:#10b98122;color:var(--green);border:1px solid #10b98155}
+  .inv-badge.abandoned{background:#27272a;color:var(--dim)}
+  .inv-badge.medium{background:#f59e0b22;color:var(--amber);border:1px solid #f59e0b55}
+  .inv-badge.low{background:#27272a;color:var(--mut)}
+  .inv-chevron{color:var(--dim);font-size:11px;transition:transform .15s;flex-shrink:0}
+  .inv-card.open .inv-chevron{transform:rotate(90deg)}
+  .inv-detail{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}
+  .inv-card.open .inv-detail{display:block}
+  .inv-field{margin-top:11px}
+  .inv-field .lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:3px}
+  .inv-field .val{font-size:12.5px;color:#d4d4d8;line-height:1.55}
+  .inv-empty{color:var(--dim);font-style:italic;font-size:12px}
+  .inv-scores{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .inv-score{background:#0f0f11;border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:11px}
+  .inv-score b{color:var(--txt);font-family:monospace}
+  .swap-flow{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+  .swap-arrow{color:var(--dim);font-size:13px}
+  .swap-unresolved{color:var(--dim);font-size:10.5px;font-style:italic;margin-left:4px}
+  .cat-card{display:flex;gap:12px;background:#161618;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:7px}
+  .cat-card.sev-high{border-left-color:var(--red)}
+  .cat-card.sev-medium{border-left-color:var(--amber)}
+  .cat-card.sev-low{border-left-color:var(--mut)}
+  .cat-days{font-family:monospace;font-size:11px;color:var(--dim);white-space:nowrap;text-align:right;flex-shrink:0}
+  .analysis-link{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;color:var(--indigo);cursor:pointer;margin-left:6px;text-decoration:none;border-bottom:1px dotted var(--indigo)}
+  .analysis-link:hover{color:#fafafa}
+  .ov-highlight{background:#161618;border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:10px}
+  .ov-highlight .lbl{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -188,6 +230,10 @@
     <button class="tab" data-t="rotations">🔄 Rotations</button>
     <button class="tab" data-t="calendar">📅 Calendar</button>
     <button class="tab" data-t="open">📋 Open Items</button>
+    <button class="tab" data-t="overview">🧭 Overview</button>
+    <button class="tab" data-t="research">🔬 Research <span class="ct" id="ct-research"></span></button>
+    <button class="tab" data-t="swaps">🔀 Opportunities <span class="ct" id="ct-swaps"></span></button>
+    <button class="tab" data-t="catalysts">⏰ Catalysts <span class="ct" id="ct-catalysts"></span></button>
   </div>
 
   <!-- LIST PANELS (generalist, tradfi, watchlist) -->
@@ -243,6 +289,27 @@
   <div class="panel" data-panel="open" style="display:none">
     <div class="note red"><b>Open items / pending decisions</b></div>
     <div id="t-open"></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="panel" data-panel="overview" style="display:none">
+    <div id="t-overview"></div>
+  </div>
+
+  <!-- RESEARCH / PROJECT ANALYSIS -->
+  <div class="panel" data-panel="research" style="display:none">
+    <input type="text" id="research-search" class="inv-search" placeholder="Filter by token or project name…" oninput="renderResearch()">
+    <div id="t-research"></div>
+  </div>
+
+  <!-- OPPORTUNITIES / POTENTIAL SWAPS -->
+  <div class="panel" data-panel="swaps" style="display:none">
+    <div id="t-swaps"></div>
+  </div>
+
+  <!-- CATALYSTS / REMINDERS -->
+  <div class="panel" data-panel="catalysts" style="display:none">
+    <div id="t-catalysts"></div>
   </div>
 
   <div class="foot" id="foot"></div>
@@ -484,7 +551,7 @@ async function loadData() {
   srcEl.className = "source live";
   srcEl.textContent = "loading · supabase…";
 
-  const [ci, ph, rot, rbi, ce, oi, mar, mrk] = await Promise.all([
+  const [ci, ph, rot, rbi, ce, oi, mar, mrk, pa, ps, rem] = await Promise.all([
     fetchTable(REST + "conviction_items?select=*&order=list_name.asc,rank.asc", "conviction_items"),
     fetchTable(REST + "portfolio_holdings?select=*", "portfolio_holdings"),
     fetchTable(REST + "rotations?select=*&order=position.asc", "rotations"),
@@ -493,18 +560,67 @@ async function loadData() {
     fetchTable(REST + "open_items?select=*&order=created_at.asc", "open_items"),
     fetchTable(REST + "multi_ai_rounds?select=*", "multi_ai_rounds"),
     fetchTable(REST + "multi_ai_rankings?select=*&order=ai_name.asc,rank.asc", "multi_ai_rankings"),
+    fetchTable(REST + "project_analysis?select=*&order=analysis_date.desc", "project_analysis"),
+    fetchTable(REST + "potential_swaps?select=*&order=priority.asc.nullslast", "potential_swaps"),
+    fetchTable(REST + "reminders?select=*&order=event_at.asc.nullslast", "reminders"),
   ]);
 
   let anyFailed = false, anySucceeded = false;
-  const loadErrors = { generalist: false, tradfi: false, watchlist: false, portfolio: false, rotations: false, calendar: false, openItems: false, multiAI: false };
+  const loadErrors = { generalist: false, tradfi: false, watchlist: false, portfolio: false, rotations: false, calendar: false, openItems: false, multiAI: false, research: false, swaps: false, catalysts: false };
 
   let generalist, tradfi, watchlist;
   if (ci) {
     anySucceeded = true;
     const byList = { generalist: [], tradfi: [], watchlist: [] };
-    ci.forEach(r => { if (byList[r.list_name]) byList[r.list_name].push({ id: r.id, token: r.token, name: r.name, narrative: r.narrative, status: r.status, cgid: r.cgid, note: r.note }); });
+    ci.forEach(r => { if (byList[r.list_name]) byList[r.list_name].push({ id: r.id, token: r.token, name: r.name, narrative: r.narrative, status: r.status, cgid: r.cgid, note: r.note, latestAnalysisId: r.latest_analysis_id }); });
     generalist = byList.generalist; tradfi = byList.tradfi; watchlist = byList.watchlist;
   } else { anyFailed = true; generalist = []; tradfi = []; watchlist = []; loadErrors.generalist = loadErrors.tradfi = loadErrors.watchlist = true; }
+
+  let research;
+  if (pa) {
+    anySucceeded = true;
+    research = pa.map(r => ({
+      id: r.id, token: r.token, projectName: r.project_name, category: r.category,
+      analysisDate: r.analysis_date, analysisBy: r.analysis_by, analysisType: r.analysis_type,
+      frameworkVersion: r.framework_version, thesis: r.thesis, bullCase: r.bull_case, bearCase: r.bear_case,
+      keyCatalysts: r.key_catalysts, keyRisks: r.key_risks, tokenValueCapture: r.token_value_capture,
+      adoptionTraction: r.adoption_traction, competitiveMoat: r.competitive_moat, liquidityNotes: r.liquidity_notes,
+      tokenomicsNotes: r.tokenomics_notes, valuationNotes: r.valuation_notes,
+      scoreAsymmetry: r.score_asymmetry, scoreProbWeightedReturn: r.score_probability_weighted_return,
+      scoreTokenValueCapture: r.score_token_value_capture, scoreSupplyUnlocks: r.score_supply_unlocks,
+      scoreCatalysts: r.score_catalysts, scoreAdoptionTraction: r.score_adoption_traction,
+      scoreCompetitiveMoat: r.score_competitive_moat, scoreLiquidity: r.score_liquidity,
+      scoreDownsideRisk: r.score_downside_risk, overallRating: r.overall_rating, conviction: r.conviction,
+      status: r.status, conclusion: r.conclusion, priceUsd: r.price_usd, marketCapUsd: r.market_cap_usd,
+      fdvUsd: r.fdv_usd, tvlUsd: r.tvl_usd, circulatingSupply: r.circulating_supply, maxSupply: r.max_supply,
+      sourceUrls: r.source_urls || [], tags: r.tags || [], snapshotNotes: r.snapshot_notes,
+      nextReviewDate: r.next_review_date, supersedesAnalysisId: r.supersedes_analysis_id, cgid: r.cgid
+    }));
+  } else { anyFailed = true; research = []; loadErrors.research = true; }
+
+  let swaps;
+  if (ps) {
+    anySucceeded = true;
+    swaps = ps.map(r => ({
+      id: r.id, sourceToken: r.source_token, targetToken: r.target_token, status: r.status,
+      priority: r.priority, conviction: r.conviction, sourceSellPct: r.source_sell_pct,
+      proceedsSharePct: r.proceeds_share_pct, targetWeightPct: r.target_weight_pct, thesis: r.thesis,
+      whyNow: r.why_now, trigger: r.trigger, invalidation: r.invalidation, catalysts: r.catalysts,
+      riskNotes: r.risk_notes, reviewDate: r.review_date, lastReviewedAt: r.last_reviewed_at,
+      note: r.note, sourceAnalysisId: r.source_analysis_id, targetAnalysisId: r.target_analysis_id
+    }));
+  } else { anyFailed = true; swaps = []; loadErrors.swaps = true; }
+
+  let catalysts;
+  if (rem) {
+    anySucceeded = true;
+    catalysts = rem.map(r => ({
+      id: r.id, token: r.token, title: r.title, reminderType: r.reminder_type, eventAt: r.event_at,
+      remindAt: r.remind_at, severity: r.severity, status: r.status, action: r.action, details: r.details,
+      sourceUrl: r.source_url, recurrenceRule: r.recurrence_rule, snoozeUntil: r.snooze_until,
+      completedAt: r.completed_at, note: r.note
+    }));
+  } else { anyFailed = true; catalysts = []; loadErrors.catalysts = true; }
 
   let portfolio;
   if (ph) { anySucceeded = true; portfolio = ph.map(r => ({ id: r.id, token: r.token, name: r.name, qty: Number(r.qty), costEur: r.cost_eur == null ? null : Number(r.cost_eur), cgid: r.cgid, note: r.note })); }
@@ -538,6 +654,7 @@ async function loadData() {
     version: anyFailed ? (anySucceeded ? "v5-partial" : "v5-failed") : "v5-supabase",
     lastUpdated: new Date().toISOString(),
     generalist, tradfi, watchlist, portfolio, rotations, calendar, openItems, multiAI, loadErrors,
+    research, swaps, catalysts,
     loadErrorDetails: Object.assign({}, loadErrorDetails)
   };
 
@@ -741,6 +858,9 @@ function renderCounts() {
   document.getElementById("ct-generalist").textContent = data.generalist?.length || 0;
   document.getElementById("ct-tradfi").textContent = data.tradfi?.length || 0;
   document.getElementById("ct-watchlist").textContent = data.watchlist?.length || 0;
+  document.getElementById("ct-research").textContent = data.research?.length || 0;
+  document.getElementById("ct-swaps").textContent = data.swaps?.length || 0;
+  document.getElementById("ct-catalysts").textContent = data.catalysts?.length || 0;
 }
 
 function renderList(listName) {
@@ -804,7 +924,7 @@ function renderTokenCard(listName, x, i, total) {
       <span class="rank">#${i+1}</span>
       ${chip(x.token)}
       <div class="tinfo">
-        <div class="tname">${x.token||"?"}</div>
+        <div class="tname">${x.token||"?"}${x.latestAnalysisId ? `<a class="analysis-link" onclick="event.stopPropagation();goToAnalysis('${x.latestAnalysisId}')">🔬 analysis</a>` : ''}</div>
         <div class="tsub">${x.name||""} · <span class="narr" style="margin-left:2px">${x.narrative||""}</span></div>
       </div>
       <div>
@@ -1027,12 +1147,233 @@ function renderOpen() {
   document.getElementById("t-open").innerHTML = rows;
 }
 
+/* ============================================================
+   INVESTMENT MEMORY LAYER — Overview / Research / Opportunities / Catalysts
+   Phase 4: read/view only. No writes, no new tables, no schema changes.
+   ============================================================ */
+const usd = (n) => n==null ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 4 : 2 });
+const bigUsd = (n) => n==null ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+function daysUntil(iso) {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.round(ms / 86400000);
+}
+function fmtDaysUntil(iso) {
+  const d = daysUntil(iso);
+  if (d == null) return "—";
+  if (d < 0) return `${Math.abs(d)}d ago`;
+  if (d === 0) return "today";
+  return `in ${d}d`;
+}
+const statusBadgeClass = (s) => s ? s.toLowerCase() : "";
+let expandedResearchIds = new Set();
+function toggleResearchCard(id) {
+  if (expandedResearchIds.has(id)) expandedResearchIds.delete(id); else expandedResearchIds.add(id);
+  renderResearch();
+}
+function goToAnalysis(analysisId) {
+  if (!analysisId) return;
+  activeTab = "research";
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.t === "research"));
+  document.querySelectorAll("[data-panel]").forEach(p => p.style.display = p.dataset.panel === "research" ? "" : "none");
+  expandedResearchIds.add(analysisId);
+  renderResearch();
+  setTimeout(() => {
+    const el = document.getElementById("research-card-" + analysisId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 30);
+}
+
+function renderOverview() {
+  const research = data.research || [], swaps = data.swaps || [], catalysts = data.catalysts || [];
+  if ((data.loadErrors?.research) || (data.loadErrors?.swaps) || (data.loadErrors?.catalysts)) {
+    document.getElementById("t-overview").innerHTML = `<div class="note red">Couldn't fully load the investment-memory layer from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const openSwaps = swaps.filter(s => !["EXECUTED","ABANDONED"].includes(s.status));
+  const openCatalysts = catalysts.filter(c => c.status === "OPEN").sort((a,b) => new Date(a.eventAt) - new Date(b.eventAt));
+  const linkedConviction = ["generalist","tradfi","watchlist"].reduce((sum,l) => sum + (data[l]||[]).filter(x => x.latestAnalysisId).length, 0);
+  const topSwaps = [...openSwaps].sort((a,b) => (a.priority??99) - (b.priority??99)).slice(0,3);
+  const nextCatalyst = openCatalysts[0];
+
+  document.getElementById("t-overview").innerHTML = `
+    <div class="cards">
+      <div class="card"><div class="lbl">Research snapshots</div><div class="val">${research.length}</div></div>
+      <div class="card"><div class="lbl">Open potential swaps</div><div class="val">${openSwaps.length}</div></div>
+      <div class="card"><div class="lbl">Upcoming reminders</div><div class="val">${openCatalysts.length}</div></div>
+      <div class="card"><div class="lbl">Linked conviction records</div><div class="val">${linkedConviction} <span style="font-size:12px;color:var(--dim)">/ ${(data.generalist?.length||0)+(data.tradfi?.length||0)+(data.watchlist?.length||0)}</span></div></div>
+    </div>
+    <div class="ov-highlight">
+      <div class="lbl">Highest-priority swap candidates</div>
+      ${topSwaps.length ? topSwaps.map(s => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+          <span class="swap-flow" style="font-size:13px">${chip(s.sourceToken)}<span class="swap-arrow">→</span>${chip(s.targetToken)}</span>
+          <span class="inv-badge ${statusBadgeClass(s.status)}">${s.status}</span>
+          <span style="font-size:11px;color:var(--dim)">priority ${s.priority ?? "—"}</span>
+        </div>`).join("") : `<div class="inv-empty">No open swap candidates.</div>`}
+    </div>
+    <div class="ov-highlight">
+      <div class="lbl">Next important catalyst</div>
+      ${nextCatalyst ? `
+        <div style="display:flex;align-items:center;gap:10px">
+          ${chip(nextCatalyst.token)}
+          <div style="flex:1"><b>${nextCatalyst.title}</b><div style="font-size:11px;color:var(--dim)">${nextCatalyst.reminderType} · ${fmtDaysUntil(nextCatalyst.eventAt)}</div></div>
+          <span class="inv-badge ${statusBadgeClass(nextCatalyst.severity)}">${nextCatalyst.severity}</span>
+        </div>` : `<div class="inv-empty">No open reminders.</div>`}
+    </div>
+    <div class="note amber" style="margin-top:4px">This is an investment-memory / decision-support view, not a price ticker — figures above reflect research and process state, not live market prices.</div>
+  `;
+}
+
+function renderResearch() {
+  if (data.loadErrors?.research) {
+    document.getElementById("t-research").innerHTML = `<div class="note red">Couldn't load project_analysis from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const q = (document.getElementById("research-search")?.value || "").trim().toLowerCase();
+  const list = (data.research || []).filter(r => !q || (r.token||"").toLowerCase().includes(q) || (r.projectName||"").toLowerCase().includes(q));
+  if (list.length === 0) {
+    document.getElementById("t-research").innerHTML = `<div class="inv-empty" style="padding:20px 0">No analyses match.</div>`;
+    return;
+  }
+  const allResearch = data.research || [];
+  document.getElementById("t-research").innerHTML = list.map(r => {
+    const isOpen = expandedResearchIds.has(r.id);
+    const badges = [];
+    if (r.analysisType === "MIGRATED_CONVICTION_NOTE") badges.push(`<span class="inv-badge muted" title="Preserved research note migrated from the old conviction layer — not necessarily a full formal analysis">MIGRATED NOTE</span>`);
+    if (r.status) badges.push(`<span class="inv-badge ${statusBadgeClass(r.status)}">${r.status}</span>`);
+    if (r.conviction) badges.push(`<span class="inv-badge ${statusBadgeClass(r.conviction)}">${r.conviction} conviction</span>`);
+    if (r.overallRating != null) badges.push(`<span class="inv-badge accumulate">${Number(r.overallRating).toFixed(1)}/10</span>`);
+
+    const scores = [
+      ["Asymmetry", r.scoreAsymmetry], ["Prob-weighted return", r.scoreProbWeightedReturn],
+      ["Token value capture", r.scoreTokenValueCapture], ["Supply/unlocks", r.scoreSupplyUnlocks],
+      ["Catalysts", r.scoreCatalysts], ["Adoption/traction", r.scoreAdoptionTraction],
+      ["Competitive moat", r.scoreCompetitiveMoat], ["Liquidity", r.scoreLiquidity],
+      ["Downside risk", r.scoreDownsideRisk]
+    ].filter(([,v]) => v != null);
+
+    const marketFields = [
+      ["Price", usd(r.priceUsd)], ["Market cap", bigUsd(r.marketCapUsd)], ["FDV", bigUsd(r.fdvUsd)],
+      ["TVL", bigUsd(r.tvlUsd)], ["Circulating supply", r.circulatingSupply==null?"—":Number(r.circulatingSupply).toLocaleString()],
+      ["Max supply", r.maxSupply==null?"—":Number(r.maxSupply).toLocaleString()]
+    ].filter(([,v]) => v !== "—");
+
+    const linkedConv = ["generalist","tradfi","watchlist"]
+      .flatMap(l => (data[l]||[]).filter(x => x.latestAnalysisId === r.id).map(x => ({ list: l, ...x })));
+
+    const history = allResearch.filter(o => o.token === r.token && o.id !== r.id)
+      .sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
+
+    const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
+
+    return `<div class="inv-card ${isOpen?'open':''}" id="research-card-${r.id}">
+      <div class="inv-card-head" onclick="toggleResearchCard('${r.id}')">
+        ${chip(r.token)}
+        <div class="inv-card-main">
+          <div class="tname">${r.projectName || r.token} <span style="color:var(--dim);font-weight:400">· ${r.category||"—"}</span></div>
+          <div class="tsub">${r.analysisDate||"—"} · ${r.analysisBy||"attribution not recorded"}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${badges.join("")}</div>
+        <div class="inv-chevron">▶</div>
+      </div>
+      <div class="inv-detail">
+        ${field("Thesis", r.thesis)}
+        ${field("Bull case", r.bullCase)}
+        ${field("Bear case", r.bearCase)}
+        ${field("Key catalysts", r.keyCatalysts)}
+        ${field("Key risks", r.keyRisks)}
+        ${field("Token value capture", r.tokenValueCapture)}
+        ${field("Adoption / traction", r.adoptionTraction)}
+        ${field("Competitive moat", r.competitiveMoat)}
+        ${field("Liquidity notes", r.liquidityNotes)}
+        ${field("Tokenomics notes", r.tokenomicsNotes)}
+        ${field("Valuation notes", r.valuationNotes)}
+        ${field("Conclusion", r.conclusion)}
+        ${field("Snapshot notes", r.snapshotNotes)}
+        ${scores.length ? `<div class="inv-field"><div class="lbl">Scores (0–10)</div><div class="inv-scores">${scores.map(([k,v]) => `<div class="inv-score">${k}: <b>${Number(v).toFixed(1)}</b></div>`).join("")}</div></div>` : `<div class="inv-field"><div class="lbl">Scores</div><div class="inv-empty">Not yet scored</div></div>`}
+        ${marketFields.length ? `<div class="inv-field"><div class="lbl">Market snapshot at time of analysis</div><div class="inv-scores">${marketFields.map(([k,v]) => `<div class="inv-score">${k}: <b>${v}</b></div>`).join("")}</div></div>` : ""}
+        ${r.tags?.length ? `<div class="inv-field"><div class="lbl">Tags</div><div class="val">${r.tags.join(", ")}</div></div>` : ""}
+        ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
+        <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
+        ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType})`).join(", ")}</div></div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderSwaps() {
+  if (data.loadErrors?.swaps) {
+    document.getElementById("t-swaps").innerHTML = `<div class="note red">Couldn't load potential_swaps from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const list = data.swaps || [];
+  if (list.length === 0) { document.getElementById("t-swaps").innerHTML = `<div class="inv-empty" style="padding:20px 0">No potential swaps recorded.</div>`; return; }
+  const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
+  document.getElementById("t-swaps").innerHTML = list.map(s => {
+    const pcts = [["Source sell", s.sourceSellPct], ["Proceeds share", s.proceedsSharePct], ["Target weight", s.targetWeightPct]].filter(([,v]) => v != null);
+    return `<div class="inv-card open">
+      <div class="inv-card-head" style="cursor:default">
+        <span class="swap-flow">${chip(s.sourceToken)}<span class="swap-arrow">→</span>${chip(s.targetToken)}${s.targetToken === "CC" ? '<span class="swap-unresolved">(ticker unresolved)</span>' : ''}</span>
+        <div style="flex:1"></div>
+        <span class="inv-badge ${statusBadgeClass(s.status)}">${s.status}</span>
+        <span style="font-size:11px;color:var(--dim)">priority ${s.priority ?? "—"}</span>
+      </div>
+      <div class="inv-detail" style="display:block">
+        ${pcts.length ? `<div class="inv-field"><div class="lbl">Allocation</div><div class="inv-scores">${pcts.map(([k,v]) => `<div class="inv-score">${k}: <b>${Number(v).toFixed(0)}%</b></div>`).join("")}</div></div>` : ""}
+        ${s.conviction != null ? `<div class="inv-field"><div class="lbl">Conviction</div><div class="val">${s.conviction}/10</div></div>` : ""}
+        ${field("Thesis", s.thesis)}
+        ${field("Why now", s.whyNow)}
+        ${field("Trigger", s.trigger)}
+        ${field("Invalidation", s.invalidation)}
+        ${field("Catalysts", s.catalysts)}
+        ${field("Risk notes", s.riskNotes)}
+        ${s.reviewDate ? field("Review date", s.reviewDate) : ""}
+        <div class="inv-field"><div class="lbl">Linked analysis</div><div class="val">
+          Source (${s.sourceToken}): ${s.sourceAnalysisId ? `<a class="analysis-link" onclick="goToAnalysis('${s.sourceAnalysisId}')">🔬 view</a>` : '<span class="inv-empty">not linked</span>'}
+          &nbsp;·&nbsp;
+          Target (${s.targetToken}): ${s.targetAnalysisId ? `<a class="analysis-link" onclick="goToAnalysis('${s.targetAnalysisId}')">🔬 view</a>` : '<span class="inv-empty">not linked</span>'}
+        </div></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderCatalysts() {
+  if (data.loadErrors?.catalysts) {
+    document.getElementById("t-catalysts").innerHTML = `<div class="note red">Couldn't load reminders from Supabase. Click ⟳ Reload above.</div>`;
+    return;
+  }
+  const list = [...(data.catalysts || [])].sort((a,b) => new Date(a.eventAt||0) - new Date(b.eventAt||0));
+  if (list.length === 0) { document.getElementById("t-catalysts").innerHTML = `<div class="inv-empty" style="padding:20px 0">No reminders recorded.</div>`; return; }
+  document.getElementById("t-catalysts").innerHTML = list.map(c => `
+    <div class="cat-card sev-${(c.severity||'low').toLowerCase()}">
+      ${chip(c.token)}
+      <div style="flex:1;min-width:0">
+        <div class="tname">${c.title}</div>
+        <div class="tsub">${c.reminderType} ${c.status !== 'OPEN' ? `· <span class="inv-badge ${statusBadgeClass(c.status)}">${c.status}</span>` : ''}</div>
+        ${c.action ? `<div style="font-size:12px;color:#d4d4d8;margin-top:6px">${c.action}</div>` : ''}
+        ${c.details ? `<div style="font-size:11.5px;color:var(--dim);margin-top:4px">${c.details}</div>` : ''}
+        ${c.sourceUrl ? `<div style="margin-top:5px"><a href="${c.sourceUrl}" target="_blank" rel="noopener" style="color:var(--indigo);font-size:11px">${c.sourceUrl}</a></div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+        <span class="inv-badge ${statusBadgeClass(c.severity)}">${c.severity}</span>
+        <span class="cat-days">${c.eventAt ? new Date(c.eventAt).toISOString().slice(0,10) : '—'}<br>${fmtDaysUntil(c.eventAt)}</span>
+      </div>
+    </div>`).join("");
+}
+
+
 function renderActive() {
   if (["generalist","tradfi","watchlist"].includes(activeTab)) renderList(activeTab);
   if (activeTab === "portfolio") renderPortfolio();
   if (activeTab === "rotations") renderRotations();
   if (activeTab === "calendar") renderCalendar();
   if (activeTab === "open") renderOpen();
+  if (activeTab === "overview") renderOverview();
+  if (activeTab === "research") renderResearch();
+  if (activeTab === "swaps") renderSwaps();
+  if (activeTab === "catalysts") renderCatalysts();
   renderCounts();
 }
 
