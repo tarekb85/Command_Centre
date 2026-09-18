@@ -74,6 +74,13 @@
   .tnote-collapsed{color:var(--dim);font-size:11px;margin-top:6px;padding-left:46px;cursor:pointer;user-select:none}
   .tnote-collapsed:hover{color:#a1a1aa}
   .tnote{cursor:pointer}
+  .thistory-list{margin-top:6px;padding-left:46px}
+  .thistory-entry{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11px}
+  .thistory-entry:last-child{border-bottom:none}
+  .thistory-date{color:var(--dim);font-family:monospace;font-size:10px;flex-shrink:0;padding-top:1px}
+  .thistory-body{flex:1;min-width:0}
+  .thistory-label{color:#d4d4d8;font-weight:600}
+  .thistory-sub{color:var(--dim);margin-top:2px}
   .tactions{display:flex;gap:4px;justify-content:flex-end;margin-top:7px;padding-left:46px;flex-wrap:wrap}
   .iconbtn{background:#161618;border:1px solid var(--line);color:#a1a1aa;border-radius:6px;padding:5px 7px;cursor:pointer;font-size:12px;font-family:inherit}
   .iconbtn:hover{background:#27272a;color:#e4e4e7}
@@ -560,6 +567,11 @@ function toggleNote(key) {
   if (expandedNotes.has(key)) expandedNotes.delete(key); else expandedNotes.add(key);
   renderList(activeTab);
 }
+let expandedHistory = new Set(); // "listName-index" keys whose decision history is expanded
+function toggleHistory(key) {
+  if (expandedHistory.has(key)) expandedHistory.delete(key); else expandedHistory.add(key);
+  renderList(activeTab);
+}
 
 const eur = (n) => n==null ? "—" : "€" + n.toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
 const px = (n) => n==null ? "—" : n >= 1000 ? "€"+n.toLocaleString("en-US",{maximumFractionDigits:0}) : n>=1 ? "€"+n.toFixed(2) : "€"+n.toFixed(4);
@@ -602,7 +614,7 @@ async function loadData() {
   srcEl.className = "source live";
   srcEl.textContent = "loading · supabase…";
 
-  const [ci, ph, rot, rbi, ce, oi, mar, mrk, pa, ps, rem] = await Promise.all([
+  const [ci, ph, rot, rbi, ce, oi, mar, mrk, pa, ps, rem, dl] = await Promise.all([
     fetchTable(REST + "conviction_items?select=*&order=list_name.asc,rank.asc", "conviction_items"),
     fetchTable(REST + "portfolio_holdings?select=*", "portfolio_holdings"),
     fetchTable(REST + "rotations?select=*&order=position.asc", "rotations"),
@@ -614,10 +626,11 @@ async function loadData() {
     fetchTable(REST + "project_analysis?select=*&order=analysis_date.desc", "project_analysis"),
     fetchTable(REST + "potential_swaps?select=*&order=priority.asc.nullslast", "potential_swaps"),
     fetchTable(REST + "reminders?select=*&order=event_at.asc.nullslast", "reminders"),
+    fetchTable(REST + "decision_log?select=*&order=decided_at.desc", "decision_log"),
   ]);
 
   let anyFailed = false, anySucceeded = false;
-  const loadErrors = { generalist: false, tradfi: false, watchlist: false, portfolio: false, rotations: false, calendar: false, openItems: false, multiAI: false, research: false, swaps: false, catalysts: false };
+  const loadErrors = { generalist: false, tradfi: false, watchlist: false, portfolio: false, rotations: false, calendar: false, openItems: false, multiAI: false, research: false, swaps: false, catalysts: false, decisions: false };
 
   let generalist, tradfi, watchlist;
   if (ci) {
@@ -674,6 +687,16 @@ async function loadData() {
     }));
   } else { anyFailed = true; catalysts = []; loadErrors.catalysts = true; }
 
+  let decisions;
+  if (dl) {
+    anySucceeded = true;
+    decisions = dl.map(r => ({
+      id: r.id, token: r.token, listName: r.list_name, eventType: r.event_type,
+      oldStatus: r.old_status, newStatus: r.new_status, reason: r.reason,
+      linkedAnalysisId: r.linked_analysis_id, decidedAt: r.decided_at
+    }));
+  } else { anyFailed = true; decisions = []; loadErrors.decisions = true; }
+
   let portfolio;
   if (ph) { anySucceeded = true; portfolio = ph.map(r => ({ id: r.id, token: r.token, name: r.name, qty: Number(r.qty), costEur: r.cost_eur == null ? null : Number(r.cost_eur), cgid: r.cgid, note: r.note })); }
   else { anyFailed = true; portfolio = []; loadErrors.portfolio = true; }
@@ -706,7 +729,7 @@ async function loadData() {
     version: anyFailed ? (anySucceeded ? "v5-partial" : "v5-failed") : "v5-supabase",
     lastUpdated: new Date().toISOString(),
     generalist, tradfi, watchlist, portfolio, rotations, calendar, openItems, multiAI, loadErrors,
-    research, swaps, catalysts,
+    research, swaps, catalysts, decisions,
     loadErrorDetails: Object.assign({}, loadErrorDetails)
   };
 
@@ -1093,6 +1116,37 @@ function renderTokenCard(listName, x, i, total) {
         ? `<div class="tnote" onclick="toggleNote('${key}')" title="Tap to collapse">${x.note}</div>`
         : `<div class="tnote-collapsed" onclick="toggleNote('${key}')" title="Tap to expand">📝 notes ▸</div>`
       ) : ""}
+    ${(() => {
+      const cardHistory = (data.decisions || [])
+        .filter(d => d.token === x.token && d.listName === listName)
+        .sort((a,b) => new Date(b.decidedAt) - new Date(a.decidedAt));
+      if (cardHistory.length === 0) return "";
+      if (!expandedHistory.has(key)) {
+        return `<div class="tnote-collapsed" onclick="toggleHistory('${key}')" title="Tap to expand">🕐 history (${cardHistory.length}) ▸</div>`;
+      }
+      const entryHtml = (d) => {
+        let label, sub = "";
+        if (d.eventType === "INITIAL") { label = `Started at ${d.newStatus || "—"}`; }
+        else if (d.eventType === "STATUS_CHANGE") { label = `${d.oldStatus || "—"} → ${d.newStatus || "—"}`; }
+        else if (d.eventType === "REASONING_UPDATE") { label = "📝 Reasoning updated"; sub = d.reason || ""; }
+        else if (d.eventType === "MOVED") { label = d.reason || "Moved"; if (d.oldStatus !== d.newStatus) sub = `${d.oldStatus || "—"} → ${d.newStatus || "—"}`; }
+        else if (d.eventType === "REMOVED") { label = `🗑 Removed (was ${d.oldStatus || "—"})`; }
+        else { label = d.eventType; }
+        const dateStr = d.decidedAt ? String(d.decidedAt).slice(0,10) : "—";
+        return `<div class="thistory-entry">
+          <div class="thistory-date">${dateStr}</div>
+          <div class="thistory-body">
+            <div class="thistory-label">${label}</div>
+            ${sub ? `<div class="thistory-sub">${sub}</div>` : ""}
+            ${d.linkedAnalysisId ? `<a class="analysis-link" onclick="event.stopPropagation();goToAnalysis('${d.linkedAnalysisId}')">🔬 view analysis</a>` : ""}
+          </div>
+        </div>`;
+      };
+      return `<div class="thistory-list">
+        ${cardHistory.map(entryHtml).join("")}
+        <div class="tnote-collapsed" onclick="toggleHistory('${key}')" style="margin-top:4px">🕐 hide history ▾</div>
+      </div>`;
+    })()}
     <div class="tactions">
       <button class="iconbtn" onclick="moveUp('${listName}',${i})" ${i===0?"disabled":""} title="Move up">↑</button>
       <button class="iconbtn" onclick="moveDown('${listName}',${i})" ${i===total-1?"disabled":""} title="Move down">↓</button>
