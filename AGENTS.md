@@ -55,6 +55,49 @@ status.
    State section for the latest per-table wiring status, and re-verify
    against the live code if it matters.
 
+## Triggering a project analysis
+
+When asked to "run analysis on X" or "analyze X and log it" (with or
+without mentioning debate), no further explanation of the process should
+be needed — follow this sequence. It's proven, not theoretical: this is
+exactly what ran successfully for AURORA on 2026-09-19.
+
+1. Read this file and `docs/INVESTMENT_SYSTEM.md` first.
+2. Query live `project_analysis` for existing rows on that token before
+   writing anything. Never overwrite an existing row — a genuine
+   re-analysis is a new row linked via `supersedes_analysis_id`.
+3. Conduct independent research and form a real, evidenced view — cite
+   specifics (dates, figures, on-chain data), not vague direction. Never
+   fabricate a score, catalyst, or risk that wasn't actually found.
+4. Write one new `project_analysis` row: `analysis_by` = the specific AI
+   name (e.g. `'Claude'`, not `'AI'`), `analysis_type = 'FULL'`,
+   `framework_version = 'v1'`, narrative fields populated genuinely from
+   what the research actually found. **Sub-scores, `overall_rating`, and
+   `next_review_date` are not mandatory fields to fill on every analysis
+   — populate them only when the analysis genuinely supports a specific
+   number or date.** Forcing a score or a review date just to satisfy a
+   template creates a data-quality problem worse than leaving it null;
+   `null` honestly means "not yet assessed," a fabricated value doesn't.
+5. If a debate was explicitly requested ("...and log it for debate"):
+   check whether an *unresolved* `debate_id` already exists for this
+   token (a debate with contribution rows but no `DEBATE_SYNTHESIS` row
+   yet). If one exists, reuse it — never fragment one debate across
+   multiple ids. Otherwise generate a fresh `debate_id` and set it on
+   this row.
+6. Report back: the row id, whether an existing analysis was found, and
+   — if this was one side of a debate — that the state is now correctly
+   shared and no copy/paste is needed for the other AI to find it.
+
+Never average scores across independent analyses, never force consensus
+between them, and never assume a plain "analyze X" implies a debate
+unless the person actually asked for one.
+
+**Debate round-by-round mechanics are intentionally not documented here
+yet** — challenge/response labeling, round caps, and stopping rules are
+still being proven in practice (AURORA is the first live test) before
+being locked in. Document those separately once something real has
+actually worked.
+
 ## Deployment
 
 - Repo: `tarekb85/Command_Centre` (public)
