@@ -81,6 +81,12 @@
   .thistory-body{flex:1;min-width:0}
   .thistory-label{color:#d4d4d8;font-weight:600}
   .thistory-sub{color:var(--dim);margin-top:2px}
+  .debate-summary{border-left:3px solid var(--indigo)}
+  .debate-ratings-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .debate-rating-box{flex:1;min-width:90px;background:#0f0f11;border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center}
+  .debate-rating-label{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .debate-rating-num{font-family:monospace;font-weight:700;font-size:15px;color:#f4f4f5;margin-top:3px}
+  .debate-rating-conv{font-size:10px;color:var(--dim);margin-top:2px;text-transform:capitalize}
   .tactions{display:flex;gap:4px;justify-content:flex-end;margin-top:7px;padding-left:46px;flex-wrap:wrap}
   .iconbtn{background:#161618;border:1px solid var(--line);color:#a1a1aa;border-radius:6px;padding:5px 7px;cursor:pointer;font-size:12px;font-family:inherit}
   .iconbtn:hover{background:#27272a;color:#e4e4e7}
@@ -571,6 +577,11 @@ let expandedHistory = new Set(); // "listName-index" keys whose decision history
 function toggleHistory(key) {
   if (expandedHistory.has(key)) expandedHistory.delete(key); else expandedHistory.add(key);
   renderList(activeTab);
+}
+let expandedDebateGroups = new Set(); // debate_id values whose summary card is expanded to show full debate
+function toggleDebateGroup(debateId) {
+  if (expandedDebateGroups.has(debateId)) expandedDebateGroups.delete(debateId); else expandedDebateGroups.add(debateId);
+  renderResearch();
 }
 
 const eur = (n) => n==null ? "—" : "€" + n.toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
@@ -1481,6 +1492,73 @@ function renderOverview() {
   `;
 }
 
+function renderResearchCard(r, allResearch) {
+  const isOpen = expandedResearchIds.has(r.id);
+  const isSynthesis = r.analysisType === "DEBATE_SYNTHESIS";
+  const badges = [];
+  if (r.analysisType === "MIGRATED_CONVICTION_NOTE") badges.push(`<span class="inv-badge muted" title="Preserved research note migrated from the old conviction layer — not necessarily a full formal analysis">MIGRATED NOTE</span>`);
+  if (isSynthesis) badges.push(`<span class="inv-badge accumulate" title="The resolved synthesis of a formal AI debate — agreements, disagreements, and open questions, not an averaged score">⚖️ SYNTHESIS</span>`);
+  else if (r.debateId) badges.push(`<span class="inv-badge muted" title="One independent contribution to a formal AI debate on this token">🗣 DEBATE</span>`);
+  if (r.status) badges.push(`<span class="inv-badge ${statusBadgeClass(r.status)}">${r.status}</span>`);
+  if (r.conviction) badges.push(`<span class="inv-badge ${statusBadgeClass(r.conviction)}">${r.conviction} conviction</span>`);
+  if (r.overallRating != null) badges.push(`<span class="inv-badge accumulate">${Number(r.overallRating).toFixed(1)}/10</span>`);
+
+  const scores = [
+    ["Asymmetry", r.scoreAsymmetry], ["Prob-weighted return", r.scoreProbWeightedReturn],
+    ["Token value capture", r.scoreTokenValueCapture], ["Supply/unlocks", r.scoreSupplyUnlocks],
+    ["Catalysts", r.scoreCatalysts], ["Adoption/traction", r.scoreAdoptionTraction],
+    ["Competitive moat", r.scoreCompetitiveMoat], ["Liquidity", r.scoreLiquidity],
+    ["Downside risk", r.scoreDownsideRisk]
+  ].filter(([,v]) => v != null);
+
+  const marketFields = [
+    ["Price", usd(r.priceUsd)], ["Market cap", bigUsd(r.marketCapUsd)], ["FDV", bigUsd(r.fdvUsd)],
+    ["TVL", bigUsd(r.tvlUsd)], ["Circulating supply", r.circulatingSupply==null?"—":Number(r.circulatingSupply).toLocaleString()],
+    ["Max supply", r.maxSupply==null?"—":Number(r.maxSupply).toLocaleString()]
+  ].filter(([,v]) => v !== "—");
+
+  const linkedConv = ["generalist","tradfi","watchlist"]
+    .flatMap(l => (data[l]||[]).filter(x => x.latestAnalysisId === r.id).map(x => ({ list: l, ...x })));
+
+  const history = allResearch.filter(o => o.token === r.token && o.id !== r.id)
+    .sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
+
+  const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
+
+  return `<div class="inv-card ${isOpen?'open':''} ${isSynthesis?'synthesis':''}" id="research-card-${r.id}">
+    <div class="inv-card-head" onclick="toggleResearchCard('${r.id}')">
+      ${chip(r.token)}
+      <div class="inv-card-main">
+        <div class="tname">${r.projectName || r.token} <span style="color:var(--dim);font-weight:400">· ${r.category||"—"}</span></div>
+        <div class="tsub">${r.analysisDate||"—"} · ${r.analysisBy||"attribution not recorded"}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${badges.join("")}</div>
+      <div class="inv-chevron">▶</div>
+    </div>
+    <div class="inv-detail">
+      ${field("Thesis", r.thesis)}
+      ${field("Bull case", r.bullCase)}
+      ${field("Bear case", r.bearCase)}
+      ${field("Key catalysts", r.keyCatalysts)}
+      ${field("Key risks", r.keyRisks)}
+      ${field("Token value capture", r.tokenValueCapture)}
+      ${field("Adoption / traction", r.adoptionTraction)}
+      ${field("Competitive moat", r.competitiveMoat)}
+      ${field("Liquidity notes", r.liquidityNotes)}
+      ${field("Tokenomics notes", r.tokenomicsNotes)}
+      ${field("Valuation notes", r.valuationNotes)}
+      ${field("Conclusion", r.conclusion)}
+      ${field("Snapshot notes", r.snapshotNotes)}
+      ${scores.length ? `<div class="inv-field"><div class="lbl">Scores (0–10)</div><div class="inv-scores">${scores.map(([k,v]) => `<div class="inv-score">${k}: <b>${Number(v).toFixed(1)}</b></div>`).join("")}</div></div>` : `<div class="inv-field"><div class="lbl">Scores</div><div class="inv-empty">Not yet scored</div></div>`}
+      ${marketFields.length ? `<div class="inv-field"><div class="lbl">Market snapshot at time of analysis</div><div class="inv-scores">${marketFields.map(([k,v]) => `<div class="inv-score">${k}: <b>${v}</b></div>`).join("")}</div></div>` : ""}
+      ${r.tags?.length ? `<div class="inv-field"><div class="lbl">Tags</div><div class="val">${r.tags.join(", ")}</div></div>` : ""}
+      ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
+      <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
+      ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
+    </div>
+  </div>`;
+}
+
 function renderResearch() {
   if (data.loadErrors?.research) {
     document.getElementById("t-research").innerHTML = `<div class="note red">Couldn't load project_analysis from Supabase. Click ⟳ Reload above.</div>`;
@@ -1493,72 +1571,80 @@ function renderResearch() {
     return;
   }
   const allResearch = data.research || [];
-  document.getElementById("t-research").innerHTML = list.map(r => {
-    const isOpen = expandedResearchIds.has(r.id);
-    const isSynthesis = r.analysisType === "DEBATE_SYNTHESIS";
-    const badges = [];
-    if (r.analysisType === "MIGRATED_CONVICTION_NOTE") badges.push(`<span class="inv-badge muted" title="Preserved research note migrated from the old conviction layer — not necessarily a full formal analysis">MIGRATED NOTE</span>`);
-    if (isSynthesis) badges.push(`<span class="inv-badge accumulate" title="The resolved synthesis of a formal AI debate — agreements, disagreements, and open questions, not an averaged score">⚖️ SYNTHESIS</span>`);
-    else if (r.debateId) badges.push(`<span class="inv-badge muted" title="One independent contribution to a formal AI debate on this token">🗣 DEBATE</span>`);
-    if (r.status) badges.push(`<span class="inv-badge ${statusBadgeClass(r.status)}">${r.status}</span>`);
-    if (r.conviction) badges.push(`<span class="inv-badge ${statusBadgeClass(r.conviction)}">${r.conviction} conviction</span>`);
-    if (r.overallRating != null) badges.push(`<span class="inv-badge accumulate">${Number(r.overallRating).toFixed(1)}/10</span>`);
 
-    const scores = [
-      ["Asymmetry", r.scoreAsymmetry], ["Prob-weighted return", r.scoreProbWeightedReturn],
-      ["Token value capture", r.scoreTokenValueCapture], ["Supply/unlocks", r.scoreSupplyUnlocks],
-      ["Catalysts", r.scoreCatalysts], ["Adoption/traction", r.scoreAdoptionTraction],
-      ["Competitive moat", r.scoreCompetitiveMoat], ["Liquidity", r.scoreLiquidity],
-      ["Downside risk", r.scoreDownsideRisk]
-    ].filter(([,v]) => v != null);
+  // Group rows sharing a debate_id into one collapsed summary; everything
+  // else renders exactly as before, one card each.
+  const debateGroups = {};
+  const standalone = [];
+  list.forEach(r => {
+    if (r.debateId) { (debateGroups[r.debateId] = debateGroups[r.debateId] || []).push(r); }
+    else standalone.push(r);
+  });
 
-    const marketFields = [
-      ["Price", usd(r.priceUsd)], ["Market cap", bigUsd(r.marketCapUsd)], ["FDV", bigUsd(r.fdvUsd)],
-      ["TVL", bigUsd(r.tvlUsd)], ["Circulating supply", r.circulatingSupply==null?"—":Number(r.circulatingSupply).toLocaleString()],
-      ["Max supply", r.maxSupply==null?"—":Number(r.maxSupply).toLocaleString()]
-    ].filter(([,v]) => v !== "—");
+  const renderRatingBox = (label, rating, conviction) => `
+    <div class="debate-rating-box">
+      <div class="debate-rating-label">${label}</div>
+      <div class="debate-rating-num">${rating != null ? Number(rating).toFixed(1) + '/10' : '—'}</div>
+      <div class="debate-rating-conv">${conviction || 'not rated'}</div>
+    </div>`;
 
-    const linkedConv = ["generalist","tradfi","watchlist"]
-      .flatMap(l => (data[l]||[]).filter(x => x.latestAnalysisId === r.id).map(x => ({ list: l, ...x })));
+  const renderDebateSummary = (debateId, rows) => {
+    const isOpen = expandedDebateGroups.has(debateId);
+    const synthesis = rows.find(r => r.analysisType === "DEBATE_SYNTHESIS");
+    // "Original" independent takes: FULL analyses that aren't a labeled debate
+    // round (those contain "Round" in analysisBy) and aren't the synthesis.
+    const originals = rows.filter(r => r.analysisType !== "DEBATE_SYNTHESIS" && !/round/i.test(r.analysisBy || ""));
+    const first = rows[0];
+    const sorted = [...rows].sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
 
-    const history = allResearch.filter(o => o.token === r.token && o.id !== r.id)
-      .sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
+    const ratingBoxes = [
+      ...originals.map(r => renderRatingBox(r.analysisBy || "—", r.overallRating, r.conviction)),
+      renderRatingBox("Synthesis", synthesis?.overallRating, synthesis?.status)
+    ].join("");
 
     const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
 
-    return `<div class="inv-card ${isOpen?'open':''} ${isSynthesis?'synthesis':''}" id="research-card-${r.id}">
-      <div class="inv-card-head" onclick="toggleResearchCard('${r.id}')">
-        ${chip(r.token)}
+    return `<div class="inv-card debate-summary ${isOpen?'open':''}">
+      <div class="inv-card-head" onclick="toggleDebateGroup('${debateId}')">
+        ${chip(first.token)}
         <div class="inv-card-main">
-          <div class="tname">${r.projectName || r.token} <span style="color:var(--dim);font-weight:400">· ${r.category||"—"}</span></div>
-          <div class="tsub">${r.analysisDate||"—"} · ${r.analysisBy||"attribution not recorded"}</div>
+          <div class="tname">${first.projectName || first.token} <span style="color:var(--dim);font-weight:400">· ${first.category||"—"}</span></div>
+          <div class="tsub">${rows.length} debate contribution${rows.length===1?'':'s'}${synthesis ? ' · synthesized' : ' · in progress, no synthesis yet'}</div>
         </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${badges.join("")}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="inv-badge muted">🗣 DEBATE SUMMARY</span>
+          ${synthesis ? `<span class="inv-badge accumulate">⚖️ SYNTHESIZED</span>` : ""}
+        </div>
         <div class="inv-chevron">▶</div>
       </div>
-      <div class="inv-detail">
-        ${field("Thesis", r.thesis)}
-        ${field("Bull case", r.bullCase)}
-        ${field("Bear case", r.bearCase)}
-        ${field("Key catalysts", r.keyCatalysts)}
-        ${field("Key risks", r.keyRisks)}
-        ${field("Token value capture", r.tokenValueCapture)}
-        ${field("Adoption / traction", r.adoptionTraction)}
-        ${field("Competitive moat", r.competitiveMoat)}
-        ${field("Liquidity notes", r.liquidityNotes)}
-        ${field("Tokenomics notes", r.tokenomicsNotes)}
-        ${field("Valuation notes", r.valuationNotes)}
-        ${field("Conclusion", r.conclusion)}
-        ${field("Snapshot notes", r.snapshotNotes)}
-        ${scores.length ? `<div class="inv-field"><div class="lbl">Scores (0–10)</div><div class="inv-scores">${scores.map(([k,v]) => `<div class="inv-score">${k}: <b>${Number(v).toFixed(1)}</b></div>`).join("")}</div></div>` : `<div class="inv-field"><div class="lbl">Scores</div><div class="inv-empty">Not yet scored</div></div>`}
-        ${marketFields.length ? `<div class="inv-field"><div class="lbl">Market snapshot at time of analysis</div><div class="inv-scores">${marketFields.map(([k,v]) => `<div class="inv-score">${k}: <b>${v}</b></div>`).join("")}</div></div>` : ""}
-        ${r.tags?.length ? `<div class="inv-field"><div class="lbl">Tags</div><div class="val">${r.tags.join(", ")}</div></div>` : ""}
-        ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
-        <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
-        ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
+      <div class="inv-detail" style="display:block">
+        <div class="debate-ratings-row">${ratingBoxes}</div>
+        ${synthesis ? `
+          ${field("Joint takeaway", synthesis.thesis)}
+          ${field("Strongest support (from synthesis)", synthesis.bullCase)}
+          ${field("Strongest opposition (from synthesis)", synthesis.bearCase)}
+          ${field("Debate notes — agreements, disagreements, open questions", synthesis.snapshotNotes)}
+          ${field("Final assessment", synthesis.conclusion)}
+        ` : `<div class="inv-field"><div class="inv-empty">No synthesis recorded yet for this debate — showing contributions only below.</div></div>`}
+        <div class="tnote-collapsed" onclick="toggleDebateGroup('${debateId}')" style="margin-top:10px;padding-left:0">
+          ${isOpen ? '▾ hide full debate' : '▸ view full debate (' + rows.length + ' entries)'}
+        </div>
+        ${isOpen ? `<div style="margin-top:8px">${sorted.map(r => renderResearchCard(r, allResearch)).join("")}</div>` : ""}
       </div>
     </div>`;
-  }).join("");
+  };
+
+  // Merge debate summaries and standalone rows back into one date-ordered
+  // feed, matching the existing overall ordering (most recent first).
+  const items = [
+    ...standalone.map(r => ({ date: r.analysisDate, html: renderResearchCard(r, allResearch) })),
+    ...Object.entries(debateGroups).map(([debateId, rows]) => ({
+      date: rows.reduce((max, r) => r.analysisDate > max ? r.analysisDate : max, rows[0].analysisDate),
+      html: renderDebateSummary(debateId, rows)
+    }))
+  ].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  document.getElementById("t-research").innerHTML = items.map(i => i.html).join("");
 }
 
 function renderSwaps() {
