@@ -578,9 +578,14 @@ function toggleHistory(key) {
   if (expandedHistory.has(key)) expandedHistory.delete(key); else expandedHistory.add(key);
   renderList(activeTab);
 }
-let expandedDebateGroups = new Set(); // debate_id values whose summary card is expanded to show full debate
+let expandedDebateGroups = new Set(); // debate_id values whose summary card is expanded
 function toggleDebateGroup(debateId) {
   if (expandedDebateGroups.has(debateId)) expandedDebateGroups.delete(debateId); else expandedDebateGroups.add(debateId);
+  renderResearch();
+}
+let expandedDebateFullView = new Set(); // debate_id values whose raw per-round cards are shown, nested inside an expanded summary
+function toggleDebateFullView(debateId) {
+  if (expandedDebateFullView.has(debateId)) expandedDebateFullView.delete(debateId); else expandedDebateFullView.add(debateId);
   renderResearch();
 }
 
@@ -1590,6 +1595,7 @@ function renderResearch() {
 
   const renderDebateSummary = (debateId, rows) => {
     const isOpen = expandedDebateGroups.has(debateId);
+    const fullOpen = expandedDebateFullView.has(debateId);
     const synthesis = rows.find(r => r.analysisType === "DEBATE_SYNTHESIS");
     // "Original" independent takes: FULL analyses that aren't a labeled debate
     // round (those contain "Round" in analysisBy) and aren't the synthesis.
@@ -1617,7 +1623,7 @@ function renderResearch() {
         </div>
         <div class="inv-chevron">▶</div>
       </div>
-      <div class="inv-detail" style="display:block">
+      <div class="inv-detail">
         <div class="debate-ratings-row">${ratingBoxes}</div>
         ${synthesis ? `
           ${field("Joint takeaway", synthesis.thesis)}
@@ -1626,10 +1632,10 @@ function renderResearch() {
           ${field("Debate notes — agreements, disagreements, open questions", synthesis.snapshotNotes)}
           ${field("Final assessment", synthesis.conclusion)}
         ` : `<div class="inv-field"><div class="inv-empty">No synthesis recorded yet for this debate — showing contributions only below.</div></div>`}
-        <div class="tnote-collapsed" onclick="toggleDebateGroup('${debateId}')" style="margin-top:10px;padding-left:0">
-          ${isOpen ? '▾ hide full debate' : '▸ view full debate (' + rows.length + ' entries)'}
+        <div class="tnote-collapsed" onclick="event.stopPropagation();toggleDebateFullView('${debateId}')" style="margin-top:10px;padding-left:0">
+          ${fullOpen ? '▾ hide full debate' : '▸ view full debate (' + rows.length + ' entries)'}
         </div>
-        ${isOpen ? `<div style="margin-top:8px">${sorted.map(r => renderResearchCard(r, allResearch)).join("")}</div>` : ""}
+        ${fullOpen ? `<div style="margin-top:8px">${sorted.map(r => renderResearchCard(r, allResearch)).join("")}</div>` : ""}
       </div>
     </div>`;
   };
