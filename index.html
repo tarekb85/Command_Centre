@@ -1670,6 +1670,11 @@ function renderResearch() {
       `<span class="inv-badge ${synthesis ? 'accumulate' : 'muted'}" title="${synthesis ? 'Synthesis rating' : 'Debate not yet synthesized'}">Synthesis: ${synthesis ? (synthesis.overallRating!=null ? Number(synthesis.overallRating).toFixed(1) : "—") : "pending"}</span>`
     ].join("");
 
+    const claudeOriginal = originals.find(r => /^claude/i.test(r.analysisBy || ""));
+    const decisionPill = claudeOriginal
+      ? `<span class="inv-badge ${statusBadgeClass(claudeOriginal.status)}" title="Claude's own recommended action for this debate — not an average, not ChatGPT's, not the synthesis's">Decision: ${claudeOriginal.status || "—"}</span>`
+      : "";
+
     return `<div class="inv-card debate-summary ${isOpen?'open':''}">
       <div class="inv-card-head" onclick="toggleDebateGroup('${debateId}')">
         ${chip(first.token)}
@@ -1678,6 +1683,7 @@ function renderResearch() {
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
           ${scorePills}
+          ${decisionPill}
         </div>
         <div class="inv-chevron">▶</div>
       </div>
