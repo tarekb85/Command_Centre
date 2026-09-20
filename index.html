@@ -1497,6 +1497,58 @@ function renderOverview() {
   `;
 }
 
+async function deleteResearchAnalysis(id) {
+  const r = (data.research || []).find(x => x.id === id);
+  if (!r) return;
+
+  const linkedFrom = ["generalist","tradfi","watchlist"]
+    .flatMap(l => (data[l]||[]).filter(x => x.latestAnalysisId === id).map(l2 => l));
+  const debateSiblings = r.debateId ? (data.research||[]).filter(x => x.debateId === r.debateId && x.id !== id).length : 0;
+
+  let msg = `Delete this ${r.token} analysis (${r.analysisDate||"undated"}, ${r.analysisBy||"attribution not recorded"})? This cannot be undone.`;
+  if (linkedFrom.length) msg += `\n\n⚠ This is currently linked as the reasoning behind your live conviction on: ${linkedFrom.join(", ")}. Deleting it will remove that link (the conviction itself is unaffected, just the reference).`;
+  if (debateSiblings > 0) msg += `\n\n⚠ This is one of ${debateSiblings + 1} entries in a debate. Deleting it will leave a gap in that record.`;
+  if (!confirm(msg)) return;
+
+  try {
+    const res = await fetch(REST + "project_analysis?id=eq." + id, { method: "DELETE", headers: sbHeaders() });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data.research = (data.research || []).filter(x => x.id !== id);
+    expandedResearchIds.delete(id);
+    toast(`Deleted ${r.token} analysis`);
+    renderActive();
+  } catch (e) {
+    console.error("Delete analysis failed:", e);
+    toast("✗ Delete failed — check console");
+  }
+}
+
+async function deleteDebateGroup(debateId) {
+  const rows = (data.research || []).filter(x => x.debateId === debateId);
+  if (!rows.length) return;
+  const token = rows[0].token;
+
+  const linkedFrom = ["generalist","tradfi","watchlist"]
+    .flatMap(l => (data[l]||[]).filter(x => rows.some(r => r.id === x.latestAnalysisId)).map(l2 => l));
+
+  let msg = `Delete this entire ${token} debate — all ${rows.length} entries (independent analyses, rounds, and synthesis)? This cannot be undone.`;
+  if (linkedFrom.length) msg += `\n\n⚠ Part of this debate is currently linked as the reasoning behind your live conviction on: ${[...new Set(linkedFrom)].join(", ")}. Deleting it will remove that link (the conviction itself is unaffected).`;
+  if (!confirm(msg)) return;
+
+  try {
+    const res = await fetch(REST + "project_analysis?debate_id=eq." + debateId, { method: "DELETE", headers: sbHeaders() });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data.research = (data.research || []).filter(x => x.debateId !== debateId);
+    expandedDebateGroups.delete(debateId);
+    expandedDebateFullView.delete(debateId);
+    toast(`Deleted ${token} debate (${rows.length} entries)`);
+    renderActive();
+  } catch (e) {
+    console.error("Delete debate failed:", e);
+    toast("✗ Delete failed — check console");
+  }
+}
+
 function renderResearchCard(r, allResearch) {
   const isOpen = expandedResearchIds.has(r.id);
   const isSynthesis = r.analysisType === "DEBATE_SYNTHESIS";
@@ -1560,6 +1612,9 @@ function renderResearchCard(r, allResearch) {
       ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
       <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
       ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
+      <div class="inv-field" style="text-align:right;margin-top:14px">
+        <a class="analysis-link" style="color:var(--red);border-bottom-color:var(--red)" onclick="event.stopPropagation();deleteResearchAnalysis('${r.id}')">🗑 delete this analysis</a>
+      </div>
     </div>
   </div>`;
 }
@@ -1610,6 +1665,11 @@ function renderResearch() {
 
     const field = (label, val) => `<div class="inv-field"><div class="lbl">${label}</div><div class="val">${val ? val : '<span class="inv-empty">not recorded</span>'}</div></div>`;
 
+    const scorePills = [
+      ...originals.map(r => `<span class="inv-badge ${statusBadgeClass(r.conviction)}" title="${r.analysisBy}'s independent rating">${(r.analysisBy||"?").split(" ")[0]}: ${r.overallRating!=null ? Number(r.overallRating).toFixed(1) : "—"}</span>`),
+      synthesis ? `<span class="inv-badge accumulate" title="Synthesis rating">Synthesis: ${synthesis.overallRating!=null ? Number(synthesis.overallRating).toFixed(1) : "—"}</span>` : ""
+    ].join("");
+
     return `<div class="inv-card debate-summary ${isOpen?'open':''}">
       <div class="inv-card-head" onclick="toggleDebateGroup('${debateId}')">
         ${chip(first.token)}
@@ -1618,8 +1678,7 @@ function renderResearch() {
           <div class="tsub">${rows.length} debate contribution${rows.length===1?'':'s'}${synthesis ? ' · synthesized' : ' · in progress, no synthesis yet'}</div>
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
-          <span class="inv-badge muted">🗣 DEBATE SUMMARY</span>
-          ${synthesis ? `<span class="inv-badge accumulate">⚖️ SYNTHESIZED</span>` : ""}
+          ${scorePills}
         </div>
         <div class="inv-chevron">▶</div>
       </div>
@@ -1636,6 +1695,9 @@ function renderResearch() {
           ${fullOpen ? '▾ hide full debate' : '▸ view full debate (' + rows.length + ' entries)'}
         </div>
         ${fullOpen ? `<div style="margin-top:8px">${sorted.map(r => renderResearchCard(r, allResearch)).join("")}</div>` : ""}
+        <div class="inv-field" style="text-align:right;margin-top:14px">
+          <a class="analysis-link" style="color:var(--red);border-bottom-color:var(--red)" onclick="event.stopPropagation();deleteDebateGroup('${debateId}')">🗑 delete this entire debate (${rows.length} entries)</a>
+        </div>
       </div>
     </div>`;
   };
