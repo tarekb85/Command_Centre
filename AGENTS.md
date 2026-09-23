@@ -92,11 +92,59 @@ Never average scores across independent analyses, never force consensus
 between them, and never assume a plain "analyze X" implies a debate
 unless the person actually asked for one.
 
-**Debate round-by-round mechanics are intentionally not documented here
-yet** — challenge/response labeling, round caps, and stopping rules are
-still being proven in practice (AURORA is the first live test) before
-being locked in. Document those separately once something real has
-actually worked.
+## Multi-round debates (locked in 2026-09-23)
+
+Proven across enough real runs now (AURORA; the ADA rotation debate; the ADA
+rematch, which caught a real Grayscale-ETF-status error mid-debate; the CC vs
+ONDO vs PLUME vs CFG debate) to lock in, per the note this section used to
+carry. This section is the answer for both AIs — if you are ChatGPT (or any
+other AI) reading this to pick up a debate, this is the whole process; no
+further explanation should be needed from Tarek.
+
+**Mechanics — deliberately simple, matching the model already in this file:**
+- One `project_analysis` row per contribution, same `debate_id`, `analysis_by`
+  identifying which AI. `analysis_type = 'FULL'` for every independent-round
+  contribution — do not invent per-round labels like `R1_CHALLENGE` or
+  `DEBATE_INDEPENDENT`. A prior session tried that; it added no value the
+  dashboard or either AI actually used, and just made rows harder to compare.
+- The one exception, and it must be **exactly** this string:
+  `analysis_type = 'DEBATE_SYNTHESIS'` for the final resolution row. This
+  broke for real on 2026-09-23 — a synthesis was written as `'SYNTHESIS'`
+  (one word short) and silently failed to render on the dashboard for over
+  an hour before it was caught. The dashboard now tolerates both spellings
+  (case-insensitively) as a safety net, but don't rely on the safety net —
+  write the exact documented string.
+- A separate `agent_workflows` / `agent_workflow_steps` schema also exists in
+  this database from an earlier, undocumented experiment. It is **not** part
+  of this convention. Don't create rows there for a new debate; the simple
+  model above is the one this file documents and the one to use.
+
+**Whose turn is it:** query `project_analysis` for the `debate_id`, order by
+`created_at`. If the latest row isn't yours and isn't `DEBATE_SYNTHESIS`,
+it's your turn — read it, then write your own row. If the latest row is
+already yours, nothing new has happened since you last went; say so plainly
+rather than repeating yourself. If a `DEBATE_SYNTHESIS` row exists, the
+debate is resolved — report the resolution; don't reopen it without being
+asked to. No fixed round count or cap — keep going until either side
+reaches synthesis or Tarek says to wrap it up.
+
+**The trigger phrase:** Tarek will say something like **"Done, check"** —
+this means one side finished a contribution in the shared database and the
+other should look, respond, or wrap up. It is not a request to re-explain
+the debate topic from scratch; the context is in the rows already. Reply
+with a short summary (what's new, what you're doing about it), not a full
+copy-paste of your row back into chat.
+
+**Verify before building on the other side's claims.** Before treating a
+specific, checkable claim in another AI's row as settled — a price, a vote
+result, a stated tokenomics mechanism, a quoted figure — verify it
+independently rather than accepting it or silently repeating it forward.
+This has caught real errors in both directions in practice: a Grayscale
+ETF-withdrawal claim that turned out correct on verification, and a claimed
+Plume buyback commitment that did not hold up when checked. Do this
+verification yourself in every "check" turn — don't skip it because the
+other side sounded confident, and don't skip it because it's inconvenient
+to search mid-debate.
 
 ## Deployment
 
@@ -133,6 +181,12 @@ actually worked.
 - GitHub Pages build status can be checked via
   `GET /repos/tarekb85/Command_Centre/pages/builds/latest` — use this to
   confirm a push actually deployed rather than assuming.
+- On 2026-09-23, a debate synthesis was written with `analysis_type =
+  'SYNTHESIS'` instead of the documented `'DEBATE_SYNTHESIS'`, and the
+  dashboard's exact-string check silently hid the summary for over an hour.
+  Fixed with a case-insensitive `isSynthesisType()` helper, but the fix is a
+  safety net, not permission to be loose with the string — see "Multi-round
+  debates" above.
 
 ## What not to do
 
