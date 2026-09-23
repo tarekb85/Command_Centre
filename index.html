@@ -598,6 +598,10 @@ const chip = (token) => {
   return `<div class="chip" style="background:${c}22;border:1px solid ${c}55;color:${c}">${(token||"?").slice(0,4)}</div>`;
 };
 const isDirty = () => JSON.stringify(data) !== JSON.stringify(savedData);
+// Documented convention is analysis_type = "DEBATE_SYNTHESIS", but treat a
+// bare "SYNTHESIS" (a naming slip either AI can make) the same way instead
+// of silently hiding the summary — case-insensitive, whitespace-tolerant.
+const isSynthesisType = (t) => /^(debate_)?synthesis$/i.test((t || "").trim());
 
 /* ============================================================
    LOAD / SAVE
@@ -1069,7 +1073,7 @@ function renderTokenCard(listName, x, i, total) {
   if (editingKey === key) {
     const tokenAnalyses = (data.research || []).filter(a => a.token === x.token)
       .sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
-    const analysisLabel = (a) => `${a.analysisDate} · ${a.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ Synthesis' : a.debateId ? '🗣 ' : ''}${a.analysisBy||'—'}`;
+    const analysisLabel = (a) => `${a.analysisDate} · ${isSynthesisType(a.analysisType) ? '⚖️ Synthesis' : a.debateId ? '🗣 ' : ''}${a.analysisBy||'—'}`;
     return `<div class="editrow" id="editform">
       <div class="editgrid">
         <div><label>Token</label><input name="token" value="${x.token||""}" /></div>
@@ -1551,7 +1555,7 @@ async function deleteDebateGroup(debateId) {
 
 function renderResearchCard(r, allResearch) {
   const isOpen = expandedResearchIds.has(r.id);
-  const isSynthesis = r.analysisType === "DEBATE_SYNTHESIS";
+  const isSynthesis = isSynthesisType(r.analysisType);
   const badges = [];
   if (r.analysisType === "MIGRATED_CONVICTION_NOTE") badges.push(`<span class="inv-badge muted" title="Preserved research note migrated from the old conviction layer — not necessarily a full formal analysis">MIGRATED NOTE</span>`);
   if (isSynthesis) badges.push(`<span class="inv-badge accumulate" title="The resolved synthesis of a formal AI debate — agreements, disagreements, and open questions, not an averaged score">⚖️ SYNTHESIS</span>`);
@@ -1611,7 +1615,7 @@ function renderResearchCard(r, allResearch) {
       ${r.tags?.length ? `<div class="inv-field"><div class="lbl">Tags</div><div class="val">${r.tags.join(", ")}</div></div>` : ""}
       ${r.sourceUrls?.length ? `<div class="inv-field"><div class="lbl">Sources</div><div class="val">${r.sourceUrls.map(u => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--indigo)">${u}</a>`).join("<br>")}</div></div>` : ""}
       <div class="inv-field"><div class="lbl">Linked conviction</div><div class="val">${linkedConv.length ? linkedConv.map(c => `${c.list} · ${c.status||"—"}`).join(", ") : '<span class="inv-empty">Not linked from any conviction list</span>'}</div></div>
-      ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${h.analysisType==='DEBATE_SYNTHESIS' ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
+      ${history.length ? `<div class="inv-field"><div class="lbl">Other analyses for ${r.token}</div><div class="val">${history.map(h => `${h.analysisDate} (${isSynthesisType(h.analysisType) ? '⚖️ synthesis' : h.debateId ? '🗣 debate: '+h.analysisType : h.analysisType})`).join(", ")}</div></div>` : ""}
       <div class="inv-field" style="text-align:right;margin-top:14px">
         <a class="analysis-link" style="color:var(--red);border-bottom-color:var(--red)" onclick="event.stopPropagation();deleteResearchAnalysis('${r.id}')">🗑 delete this analysis</a>
       </div>
@@ -1651,10 +1655,10 @@ function renderResearch() {
   const renderDebateSummary = (debateId, rows) => {
     const isOpen = expandedDebateGroups.has(debateId);
     const fullOpen = expandedDebateFullView.has(debateId);
-    const synthesis = rows.find(r => r.analysisType === "DEBATE_SYNTHESIS");
+    const synthesis = rows.find(r => isSynthesisType(r.analysisType));
     // "Original" independent takes: FULL analyses that aren't a labeled debate
     // round (those contain "Round" in analysisBy) and aren't the synthesis.
-    const originals = rows.filter(r => r.analysisType !== "DEBATE_SYNTHESIS" && !/round/i.test(r.analysisBy || ""));
+    const originals = rows.filter(r => !isSynthesisType(r.analysisType) && !/round/i.test(r.analysisBy || ""));
     const first = rows[0];
     const sorted = [...rows].sort((a,b) => new Date(b.analysisDate) - new Date(a.analysisDate));
 
